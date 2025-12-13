@@ -46,7 +46,7 @@ async def register_user(request: RegisterRequest):
                 "message": const.SERVER_MSG_REGISTER_UNIQUE_FAIL,
             }
         return {
-            "status": const.SERVER_MSG_REGISTER_OK,
+            "status": const.SERVER_SUCCESS,
             "message": const.SERVER_MSG_REGISTER_OK,
         }
     except sqlite3.Error as e:
@@ -115,7 +115,7 @@ def insert_user(username, password_hash, salt=None, totp_secret=None):
         )
 
         conn.commit()
-        print(f"Username {username} was add to database at {const.DB_PATH}")
+        print(f"Username {username} was added to database at {const.DB_PATH}")
         return True
     except sqlite3.IntegrityError:
         # Username already exists
