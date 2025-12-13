@@ -1,1 +1,4 @@
-# Simulator constants
+"""
+simulator.py
+Constants for simulator app.
+"""

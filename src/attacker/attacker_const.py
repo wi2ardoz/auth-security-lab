@@ -1,1 +1,4 @@
-# Attacker constants
+"""
+attacker_const.py
+Constants for attacker.
+"""

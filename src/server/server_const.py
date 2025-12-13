@@ -4,13 +4,14 @@ Constants for authentication server configuration and responses.
 """
 
 # Response statues
-SERVER_FAILURE = "fail"
 SERVER_SUCCESS = "success"
+SERVER_FAILURE = "fail"
 
 # Response messages
 SERVER_MSG_REGISTER_OK = "user registered successfully"
 SERVER_MSG_LOGIN_OK = "user login successfully"
 SERVER_MSG_LOGIN_TOTP_OK = "user login totp successfully"
+SERVER_MSG_REGISTER_UNIQUE_FAIL = "username already exist"
 
 # Hash modes
 HASH_SHA256 = "sha256"
@@ -18,6 +19,7 @@ HASH_BCRYPT = "bcrypt"
 HASH_ARGON2ID = "argon2id"
 
 # Defaults
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 8000
 DEFAULT_HASH_MODE = HASH_SHA256
 
