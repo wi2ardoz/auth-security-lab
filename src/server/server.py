@@ -1,13 +1,13 @@
 """
 server.py
-Authentication Server - FastAPI + SQLite
+FastAPI server for user registration and login with SQLite database.
 """
 
-import os
 import sqlite3
 
 import server_const as const
 import uvicorn
+from database import get_user, init_database, insert_user
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -63,106 +63,28 @@ async def login_user(request: LoginRequest):
                 "message": const.SERVER_MSG_LOGIN_INVALID,
             }
 
-        # TODO verify
+        # Unpack user data
         username, password_hash, salt, totp_secret = user
 
-        return {
-            "status": const.SERVER_SUCCESS,
-            "message": const.SERVER_MSG_LOGIN_OK,
-        }
+        # TODO: verify with hash_password()
+        if request.password == password_hash:
+            return {
+                "status": const.SERVER_SUCCESS,
+                "message": const.SERVER_MSG_LOGIN_OK,
+            }
+        else:
+            return {
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_LOGIN_INVALID,
+            }
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
-    username = request.username
-    password = request.password
-    totp_code = request.totp_code
-    # TODO
-    return {"status": const.SERVER_SUCCESS, "message": const.SERVER_MSG_LOGIN_TOTP_OK}
-
-
-def init_database():
-    """
-    Initialize SQLite database and create users table if it doesn't exist.
-    """
-    os.makedirs(os.path.dirname(const.DB_PATH), exist_ok=True)
-
-    conn = sqlite3.connect(const.DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-            CREATE TABLE IF NOT EXISTS users (
-                username TEXT PRIMARY KEY,
-                password_hash TEXT NOT NULL,
-                salt TEXT,
-                totp_secret TEXT
-            )
-        """
-    )
-
-    conn.commit()
-    conn.close()
-    print(f"Database initialized at {const.DB_PATH}")
-
-
-def insert_user(username, password_hash, salt=None, totp_secret=None):
-    """
-    Insert a new user into the database.
-
-    :param username: Username (unique)
-    :param password_hash: Hashed password
-    :param salt: Salt value (for SHA256 mode only)
-    :param totp_secret: TOTP (optional)
-    :return: True if success, False if user already exists
-    """
-    try:
-        conn = sqlite3.connect(const.DB_PATH)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "INSERT INTO users (username, password_hash, salt, totp_secret) VALUES (?, ?, ?, ?)",
-            (username, password_hash, salt, totp_secret),
-        )
-
-        conn.commit()
-        print(f"Username {username} was added to database at {const.DB_PATH}")
-        return True
-    except sqlite3.IntegrityError:
-        # Username already exists
-        return False
-    finally:
-        conn.close()
-
-
-def get_user(username):
-    """
-    Retrieve user from database by username.
-
-    :param username: Username to search for
-    :return: Tuple (username, password_hash, salt, totp_secret)
-        or None if not found
-    """
-    try:
-        conn = sqlite3.connect(const.DB_PATH)
-        cursor = conn.cursor()
-
-        cursor.execute(
-            """
-                SELECT username, password_hash, salt, totp_secret
-                FROM users
-                WHERE username = ?
-            """,
-            (username,),
-        )
-
-        user = cursor.fetchone()
-        conn.close()
-        return user
-    finally:
-        conn.close()
+    # TODO: Implement later
+    return {"status": const.SERVER_FAILURE, "message": "TOTP not implemented yet"}
 
 
 if __name__ == "__main__":
