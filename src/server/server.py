@@ -5,7 +5,7 @@ FastAPI server for user registration and login with SQLite database.
 
 import sqlite3
 
-import server_const as const
+import server_const as server_const
 import uvicorn
 from database import get_user, init_database, insert_user
 from fastapi import FastAPI, HTTPException
@@ -42,12 +42,12 @@ async def register_user(request: RegisterRequest):
         success = insert_user(username, password, None, None)
         if not success:
             return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_REGISTER_UNIQUE_FAIL,
+                "status": server_const.SERVER_FAILURE,
+                "message": server_const.SERVER_MSG_REGISTER_UNIQUE_FAIL,
             }
         return {
-            "status": const.SERVER_SUCCESS,
-            "message": const.SERVER_MSG_REGISTER_OK,
+            "status": server_const.SERVER_SUCCESS,
+            "message": server_const.SERVER_MSG_REGISTER_OK,
         }
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -59,8 +59,8 @@ async def login_user(request: LoginRequest):
         user = get_user(request.username)
         if user is None:
             return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_LOGIN_INVALID,
+                "status": server_const.SERVER_FAILURE,
+                "message": server_const.SERVER_MSG_LOGIN_INVALID,
             }
 
         # Unpack user data
@@ -69,13 +69,13 @@ async def login_user(request: LoginRequest):
         # TODO: verify with hash_password()
         if request.password == password_hash:
             return {
-                "status": const.SERVER_SUCCESS,
-                "message": const.SERVER_MSG_LOGIN_OK,
+                "status": server_const.SERVER_SUCCESS,
+                "message": server_const.SERVER_MSG_LOGIN_OK,
             }
         else:
             return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_LOGIN_INVALID,
+                "status": server_const.SERVER_FAILURE,
+                "message": server_const.SERVER_MSG_LOGIN_INVALID,
             }
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
@@ -84,11 +84,11 @@ async def login_user(request: LoginRequest):
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
     # TODO: Implement later
-    return {"status": const.SERVER_FAILURE, "message": "TOTP not implemented yet"}
+    return {"status": server_const.SERVER_FAILURE, "message": "TOTP not implemented yet"}
 
 
 if __name__ == "__main__":
 
     init_database()
 
-    uvicorn.run(app, host=const.DEFAULT_HOST, port=const.DEFAULT_PORT)
+    uvicorn.run(app, host=server_const.DEFAULT_HOST, port=server_const.DEFAULT_PORT)
