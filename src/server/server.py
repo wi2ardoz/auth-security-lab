@@ -8,6 +8,7 @@ import sqlite3
 import server_const as server_const
 import uvicorn
 from database import get_user, init_database, insert_user
+from defenses import hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -34,12 +35,19 @@ app = FastAPI()
 @app.post("/register")
 async def register_user(request: RegisterRequest):
     try:
-        username = request.username
-        password = request.password
+        # TODO: Load from config
+        hash_mode = server_const.DEFAULT_HASH_MODE
+        pepper = None
 
-        # TODO: Hash password
-        # TODO: totp
-        success = insert_user(username, password, None, None)
+        # Hash the password
+        password_hash, salt = hash_password(
+            request.password, hash_mode, salt=None, pepper=pepper
+        )
+
+        # TODO: Generate TOTP secret
+        totp_secret = None
+
+        success = insert_user(request.username, password_hash, salt, totp_secret)
         if not success:
             return {
                 "status": server_const.SERVER_FAILURE,
@@ -49,8 +57,11 @@ async def register_user(request: RegisterRequest):
             "status": server_const.SERVER_SUCCESS,
             "message": server_const.SERVER_MSG_REGISTER_OK,
         }
+
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
 @app.post("/login")
@@ -62,12 +73,16 @@ async def login_user(request: LoginRequest):
                 "status": server_const.SERVER_FAILURE,
                 "message": server_const.SERVER_MSG_LOGIN_INVALID,
             }
-
-        # Unpack user data
         username, password_hash, salt, totp_secret = user
 
-        # TODO: verify with hash_password()
-        if request.password == password_hash:
+        # TODO: Load from config
+        hash_mode = server_const.DEFAULT_HASH_MODE
+        pepper = None
+
+        verified = verify_password(
+            request.password, password_hash, hash_mode, salt=salt, pepper=pepper
+        )
+        if verified:
             return {
                 "status": server_const.SERVER_SUCCESS,
                 "message": server_const.SERVER_MSG_LOGIN_OK,
@@ -77,14 +92,20 @@ async def login_user(request: LoginRequest):
                 "status": server_const.SERVER_FAILURE,
                 "message": server_const.SERVER_MSG_LOGIN_INVALID,
             }
+
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
     # TODO: Implement later
-    return {"status": server_const.SERVER_FAILURE, "message": "TOTP not implemented yet"}
+    return {
+        "status": server_const.SERVER_FAILURE,
+        "message": "TOTP not implemented yet",
+    }
 
 
 if __name__ == "__main__":
