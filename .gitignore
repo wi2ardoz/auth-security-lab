@@ -31,3 +31,13 @@ htmlcov/
 # Environment variables
 .env
 .env.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+src/server/db/
+
+# Log files
+*.log
+src/logs/

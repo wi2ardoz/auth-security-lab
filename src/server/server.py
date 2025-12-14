@@ -55,10 +55,23 @@ async def register_user(request: RegisterRequest):
 
 @app.post("/login")
 async def login_user(request: LoginRequest):
-    username = request.username
-    password = request.password
-    # TODO
-    return {"status": const.SERVER_SUCCESS, "message": const.SERVER_MSG_LOGIN_OK}
+    try:
+        user = get_user(request.username)
+        if user is None:
+            return {
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_LOGIN_INVALID,
+            }
+
+        # TODO verify
+        username, password_hash, salt, totp_secret = user
+
+        return {
+            "status": const.SERVER_SUCCESS,
+            "message": const.SERVER_MSG_LOGIN_OK,
+        }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @app.post("/login_totp")
@@ -120,6 +133,34 @@ def insert_user(username, password_hash, salt=None, totp_secret=None):
     except sqlite3.IntegrityError:
         # Username already exists
         return False
+    finally:
+        conn.close()
+
+
+def get_user(username):
+    """
+    Retrieve user from database by username.
+
+    :param username: Username to search for
+    :return: Tuple (username, password_hash, salt, totp_secret)
+        or None if not found
+    """
+    try:
+        conn = sqlite3.connect(const.DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+                SELECT username, password_hash, salt, totp_secret
+                FROM users
+                WHERE username = ?
+            """,
+            (username,),
+        )
+
+        user = cursor.fetchone()
+        conn.close()
+        return user
     finally:
         conn.close()
 

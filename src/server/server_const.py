@@ -9,9 +9,10 @@ SERVER_FAILURE = "fail"
 
 # Response messages
 SERVER_MSG_REGISTER_OK = "user registered successfully"
+SERVER_MSG_REGISTER_UNIQUE_FAIL = "username already exist"
 SERVER_MSG_LOGIN_OK = "user login successfully"
 SERVER_MSG_LOGIN_TOTP_OK = "user login totp successfully"
-SERVER_MSG_REGISTER_UNIQUE_FAIL = "username already exist"
+SERVER_MSG_LOGIN_INVALID = "invalid credentials"
 
 # Hash modes
 HASH_SHA256 = "sha256"
