@@ -11,7 +11,7 @@ from database import get_user, init_database, insert_user
 from defenses import hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from utils import get_default_config, load_config, save_config
+from utils import load_config_with_cli_overrides, parse_cli_args, utils_const
 
 
 # Request models
@@ -35,7 +35,6 @@ class LoginTOTPRequest(BaseModel):
 app = FastAPI()
 
 
-# Registration endpoint
 @app.post("/register")
 async def register_user(request: RegisterRequest):
     try:
@@ -67,7 +66,6 @@ async def register_user(request: RegisterRequest):
         raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
-# Login endpoint
 @app.post("/login")
 async def login_user(request: LoginRequest):
     try:
@@ -102,7 +100,6 @@ async def login_user(request: LoginRequest):
         raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
-# TOTP Login endpoint
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
     # TODO: Implement later
@@ -119,44 +116,14 @@ def access_hash_settings():
     """
     config = app.state.config
 
-    hash_mode = config[const.CONFIG_KEY_HASH_MODE]
+    hash_mode = config[utils_const.SCHEME_KEY_HASH_MODE]
 
-    pepper_enabled = config[const.CONFIG_KEY_DEFENSES][const.CONFIG_KEY_PEPPER]
-    pepper = config[const.CONFIG_KEY_PEPPER_VALUE] if pepper_enabled else None
+    pepper_enabled = config[utils_const.SCHEME_KEY_DEFENSES][
+        utils_const.SCHEME_KEY_DEFENSE_PEPPER
+    ]
+    pepper = config[utils_const.SCHEME_KEY_PEPPER_VALUE] if pepper_enabled else None
 
     return hash_mode, pepper
-
-
-def initialize_config():
-    """
-    Initialize server configuration.
-    Loads from file or creates default if not found.
-
-    :return: Configuration dictionary
-    """
-    try:
-        config = load_config(const.CONFIG_PATH)
-        print(f"✓ Loaded configuration from {const.CONFIG_PATH}")
-        print(
-            f"  Hash: {config[const.CONFIG_KEY_HASH_MODE]}, "
-            f"Defenses: {[k for k, v in config[const.CONFIG_KEY_DEFENSES].items() if v] or 'none'}"
-        )
-        return config
-
-    except FileNotFoundError:
-        print(f"⚠ Config file not found: {const.CONFIG_PATH}")
-        print(f"  Creating default configuration...")
-
-        config = get_default_config()
-        save_config(config, const.CONFIG_PATH)
-
-        print(f"  Created default config at {const.CONFIG_PATH}")
-        print(f"⚠ Hash: {config[const.CONFIG_KEY_HASH_MODE]}, Defenses: none")
-        return config
-
-    except Exception as e:
-        print(f"✗ Error loading config: {e}")
-        raise
 
 
 if __name__ == "__main__":
@@ -164,11 +131,14 @@ if __name__ == "__main__":
     # Initialize database
     init_database()
 
-    # Initialize configuration and store in app.state
-    app.state.config = initialize_config()
+    # Parse command-line arguments
+    args = parse_cli_args()
+
+    # Load config with CLI overrides
+    app.state.config = load_config_with_cli_overrides(const.CONFIG_PATH, args)
 
     # Start server
-    host = app.state.config[const.CONFIG_KEY_HOST]
-    port = app.state.config[const.CONFIG_KEY_PORT]
+    host = app.state.config[utils_const.SCHEME_KEY_HOST]
+    port = app.state.config[utils_const.SCHEME_KEY_PORT]
     print(f"✓ Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)

@@ -7,6 +7,8 @@ Functions for loading/saving server JSON configuration file.
 import json
 import os
 
+from . import utils_const as const
+
 JSON_INDENT = 4
 
 
@@ -26,15 +28,7 @@ def load_config(config_path):
         config = json.load(f)
 
     # Validate required fields for server config
-    required_fields = [
-        "host",
-        "port",
-        "hash_mode",
-        "defenses",
-        "pepper_value",
-        "group_seed",
-    ]
-    for field in required_fields:
+    for field in const.SCHEME_REQUIRED_KEYS:
         if field not in config:
             raise ValueError(f"Missing required field in config: {field}")
 
@@ -64,18 +58,17 @@ def get_default_config():
 
     :return: Default configuration dictionary
     """
-    default_config = {
-        "host": "0.0.0.0",
-        "port": 8000,
-        "hash_mode": "sha256",
-        "defenses": {
-            "rate_limit": False,
-            "lockout": False,
-            "captcha": False,
-            "totp": False,
-            "pepper": False,
+    return {
+        const.SCHEME_KEY_HOST: const.SCHEME_VALUE_HOST_DEFAULT,
+        const.SCHEME_KEY_PORT: const.SCHEME_VALUE_PORT_DEFAULT,
+        const.SCHEME_KEY_HASH_MODE: const.SCHEME_VALUE_HASH_MODE_DEFAULT,
+        const.SCHEME_KEY_DEFENSES: {
+            const.SCHEME_KEY_DEFENSE_RATE_LIMIT: const.SCHEME_VALUE_DEFENSE_RATE_LIMIT_DEFAULT,
+            const.SCHEME_KEY_DEFENSE_LOCKOUT: const.SCHEME_VALUE_DEFENSE_LOCKOUT_DEFAULT,
+            const.SCHEME_KEY_DEFENSE_CAPTCHA: const.SCHEME_VALUE_DEFENSE_CAPTCHA_DEFAULT,
+            const.SCHEME_KEY_DEFENSE_TOTP: const.SCHEME_VALUE_DEFENSE_TOTP_DEFAULT,
+            const.SCHEME_KEY_DEFENSE_PEPPER: const.SCHEME_VALUE_DEFENSE_PEPPER_DEFAULT,
         },
-        "pepper_value": "",
-        "group_seed": "519933725",
+        const.SCHEME_KEY_PEPPER_VALUE: const.SCHEME_VALUE_PEPPER_DEFAULT,
+        const.SCHEME_KEY_GROUP_SEED: const.SCHEME_VALUE_GROUP_SEED_DEFAULT,
     }
-    return default_config
