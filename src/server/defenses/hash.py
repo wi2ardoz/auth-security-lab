@@ -1,5 +1,5 @@
 """
-hashing.py
+hash.py
 Password hashing and verification functions.
 Supports SHA256+salt, bcrypt, and argon2id.
 """

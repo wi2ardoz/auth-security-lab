@@ -58,13 +58,15 @@ pip install -r requirements.txt
 Project/
 |-- src/
 |   |-- server/
+|   |   |-- database.py             # SQLite database management
 |   |   |-- server.py               # Auth server (FastAPI + SQLite)
 |   |   |-- server_const.py         # Server constants
 |   |   |-- setup_db.py             # DB initialization
 |   |   |-- config/
 |   |   |   +-- server_config.json  # Hash mode + defense toggles
 |   |   |-- db/                     # SQLite database
-|   |   +-- defenses/               # Defense implementations
+|   |   |-- defenses/               # Defense implementations
+|   |   +-- utils/                  # Server utilities helpers
 |   |
 |   |-- attacker/
 |   |   |-- attacker.py             # Attack client (brute-force, spray)
@@ -129,6 +131,17 @@ Server flags:
 --pepper            Enable pepper
 --port <num>        Server port (default: 8000)
 ```
+
+**Configuration Behavior:**
+CLI flags define explicit experiment configurations and update `server_config.json`.
+
+| CLI Arguments | Hash Mode | Defenses | Config Update |
+|---------------|-----------|----------|---------------|
+| `python server.py` | From config | From config | No change (uses stored config) |
+| `python server.py --hash sha256` | sha256 | All disabled | Hash updated, defenses cleared |
+| `python server.py --hash bcrypt --pepper` | bcrypt | Only pepper enabled | Both updated explicitly |
+| `python server.py --pepper --rate-limit` | From config | Only specified enabled | Defenses updated, hash kept |
+| `python server.py --port 9000` | From config | From config | Only port updated |
 
 Run attacker against the server:
 ```bash

@@ -45,7 +45,17 @@ CLI flags:
 --port <num>        Server port (default: 8000)
 ```
 
-Config is also saved/loaded from server_config.json for persistence.
+Config is also saved/loaded from server_config.json for persistence. <br>
+CLI flags define explicit experiment configurations and update the stored config.
+
+| CLI Arguments | Hash Mode | Defenses | Config Update |
+|---------------|-----------|----------|---------------|
+| `python server.py` | From config | From config | No change (uses stored config) |
+| `python server.py --hash sha256` | sha256 | All disabled | Hash updated, defenses cleared |
+| `python server.py --hash bcrypt --pepper` | bcrypt | Only pepper enabled | Both updated explicitly |
+| `python server.py --pepper --rate-limit` | From config | Only specified enabled | Defenses updated, hash kept |
+| `python server.py --port 9000` | From config | From config | Only port updated |
+
 
 ### 2. attacker.py (Headless CLI)
 
@@ -206,6 +216,8 @@ Location: src/server/config/server_config.json
 
 ```
 {
+  "host": "0.0.0.0",
+  "port": 8000,
   "hash_mode": "bcrypt",
   "defenses": {
     "rate_limit": true,

@@ -11,8 +11,10 @@ from database import get_user, init_database, insert_user
 from defenses import hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from utils import get_default_config, load_config, save_config
 
 
+# Request models
 class RegisterRequest(BaseModel):
     username: str
     password: str
@@ -29,9 +31,11 @@ class LoginTOTPRequest(BaseModel):
     totp_code: str
 
 
+# FastAPI app
 app = FastAPI()
 
 
+# Registration endpoint
 @app.post("/register")
 async def register_user(request: RegisterRequest):
     try:
@@ -64,6 +68,7 @@ async def register_user(request: RegisterRequest):
         raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
+# Login endpoint
 @app.post("/login")
 async def login_user(request: LoginRequest):
     try:
@@ -99,6 +104,7 @@ async def login_user(request: LoginRequest):
         raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
+# TOTP Login endpoint
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
     # TODO: Implement later
@@ -108,8 +114,48 @@ async def login_totp_user(request: LoginTOTPRequest):
     }
 
 
+def initialize_config():
+    """
+    Initialize server configuration.
+    Loads from file or creates default if not found.
+
+    :return: Configuration dictionary
+    """
+    try:
+        config = load_config(server_const.CONFIG_PATH)
+        print(f"✓ Loaded configuration from {server_const.CONFIG_PATH}")
+        print(
+            f"  Hash: {config['hash_mode']}, "
+            f"Defenses: {[k for k, v in config['defenses'].items() if v] or 'none'}"
+        )
+        return config
+
+    except FileNotFoundError:
+        print(f"⚠ Config file not found: {server_const.CONFIG_PATH}")
+        print(f"  Creating default configuration...")
+
+        config = get_default_config()
+        save_config(config, server_const.CONFIG_PATH)
+
+        print(f"  Created default config at {server_const.CONFIG_PATH}")
+        print(f"⚠ Hash: {config['hash_mode']}, Defenses: none")
+        return config
+
+    except Exception as e:
+        print(f"✗ Error loading config: {e}")
+        raise
+
+
 if __name__ == "__main__":
 
+    # Initialize database
     init_database()
 
-    uvicorn.run(app, host=server_const.DEFAULT_HOST, port=server_const.DEFAULT_PORT)
+    # Initialize configuration and store in app.state
+    app.state.config = initialize_config()
+
+    # Start server
+    host = app.state.config["host"]
+    port = app.state.config["port"]
+    print(f"✓ Starting server on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)
