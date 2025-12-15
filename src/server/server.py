@@ -5,7 +5,7 @@ FastAPI server for user registration and login with SQLite database.
 
 import sqlite3
 
-import server_const as server_const
+import server_const as const
 import uvicorn
 from database import get_user, init_database, insert_user
 from defenses import hash_password, verify_password
@@ -39,11 +39,10 @@ app = FastAPI()
 @app.post("/register")
 async def register_user(request: RegisterRequest):
     try:
-        # TODO: Load from config
-        hash_mode = server_const.DEFAULT_HASH_MODE
-        pepper = None
+        # Retrieve hash settings from config
+        hash_mode, pepper = access_hash_settings()
 
-        # Hash the password
+        # Hash the password generate a salt as needed
         password_hash, salt = hash_password(
             request.password, hash_mode, salt=None, pepper=pepper
         )
@@ -54,12 +53,12 @@ async def register_user(request: RegisterRequest):
         success = insert_user(request.username, password_hash, salt, totp_secret)
         if not success:
             return {
-                "status": server_const.SERVER_FAILURE,
-                "message": server_const.SERVER_MSG_REGISTER_UNIQUE_FAIL,
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_REGISTER_UNIQUE_FAIL,
             }
         return {
-            "status": server_const.SERVER_SUCCESS,
-            "message": server_const.SERVER_MSG_REGISTER_OK,
+            "status": const.SERVER_SUCCESS,
+            "message": const.SERVER_MSG_REGISTER_OK,
         }
 
     except sqlite3.Error as e:
@@ -75,27 +74,26 @@ async def login_user(request: LoginRequest):
         user = get_user(request.username)
         if user is None:
             return {
-                "status": server_const.SERVER_FAILURE,
-                "message": server_const.SERVER_MSG_LOGIN_INVALID,
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_LOGIN_INVALID,
             }
         username, password_hash, salt, totp_secret = user
 
-        # TODO: Load from config
-        hash_mode = server_const.DEFAULT_HASH_MODE
-        pepper = None
+        # Retrieve hash settings from config
+        hash_mode, pepper = access_hash_settings()
 
         verified = verify_password(
             request.password, password_hash, hash_mode, salt=salt, pepper=pepper
         )
         if verified:
             return {
-                "status": server_const.SERVER_SUCCESS,
-                "message": server_const.SERVER_MSG_LOGIN_OK,
+                "status": const.SERVER_SUCCESS,
+                "message": const.SERVER_MSG_LOGIN_OK,
             }
         else:
             return {
-                "status": server_const.SERVER_FAILURE,
-                "message": server_const.SERVER_MSG_LOGIN_INVALID,
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_LOGIN_INVALID,
             }
 
     except sqlite3.Error as e:
@@ -109,9 +107,24 @@ async def login_user(request: LoginRequest):
 async def login_totp_user(request: LoginTOTPRequest):
     # TODO: Implement later
     return {
-        "status": server_const.SERVER_FAILURE,
+        "status": const.SERVER_FAILURE,
         "message": "TOTP not implemented yet",
     }
+
+
+def access_hash_settings():
+    """
+    Access hash mode and pepper settings from app state.
+    :return: Tuple of (hash_mode, pepper)
+    """
+    config = app.state.config
+
+    hash_mode = config[const.CONFIG_KEY_HASH_MODE]
+
+    pepper_enabled = config[const.CONFIG_KEY_DEFENSES][const.CONFIG_KEY_PEPPER]
+    pepper = config[const.CONFIG_KEY_PEPPER_VALUE] if pepper_enabled else None
+
+    return hash_mode, pepper
 
 
 def initialize_config():
@@ -122,23 +135,23 @@ def initialize_config():
     :return: Configuration dictionary
     """
     try:
-        config = load_config(server_const.CONFIG_PATH)
-        print(f"✓ Loaded configuration from {server_const.CONFIG_PATH}")
+        config = load_config(const.CONFIG_PATH)
+        print(f"✓ Loaded configuration from {const.CONFIG_PATH}")
         print(
-            f"  Hash: {config['hash_mode']}, "
-            f"Defenses: {[k for k, v in config['defenses'].items() if v] or 'none'}"
+            f"  Hash: {config[const.CONFIG_KEY_HASH_MODE]}, "
+            f"Defenses: {[k for k, v in config[const.CONFIG_KEY_DEFENSES].items() if v] or 'none'}"
         )
         return config
 
     except FileNotFoundError:
-        print(f"⚠ Config file not found: {server_const.CONFIG_PATH}")
+        print(f"⚠ Config file not found: {const.CONFIG_PATH}")
         print(f"  Creating default configuration...")
 
         config = get_default_config()
-        save_config(config, server_const.CONFIG_PATH)
+        save_config(config, const.CONFIG_PATH)
 
-        print(f"  Created default config at {server_const.CONFIG_PATH}")
-        print(f"⚠ Hash: {config['hash_mode']}, Defenses: none")
+        print(f"  Created default config at {const.CONFIG_PATH}")
+        print(f"⚠ Hash: {config[const.CONFIG_KEY_HASH_MODE]}, Defenses: none")
         return config
 
     except Exception as e:
@@ -155,7 +168,7 @@ if __name__ == "__main__":
     app.state.config = initialize_config()
 
     # Start server
-    host = app.state.config["host"]
-    port = app.state.config["port"]
+    host = app.state.config[const.CONFIG_KEY_HOST]
+    port = app.state.config[const.CONFIG_KEY_PORT]
     print(f"✓ Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
