@@ -9,6 +9,7 @@ import os
 
 JSON_INDENT = 4
 
+
 def load_config(config_path):
     """
     Load configuration from a JSON file.
@@ -25,7 +26,14 @@ def load_config(config_path):
         config = json.load(f)
 
     # Validate required fields for server config
-    required_fields = ["host", "port", "hash_mode", "defenses", "pepper_value", "group_seed"]
+    required_fields = [
+        "host",
+        "port",
+        "hash_mode",
+        "defenses",
+        "pepper_value",
+        "group_seed",
+    ]
     for field in required_fields:
         if field not in config:
             raise ValueError(f"Missing required field in config: {field}")
@@ -53,7 +61,7 @@ def get_default_config():
     Get the default server configuration.
     Should be used only when no config file is found.
     NOTE This default config uses no defenses.
-    
+
     :return: Default configuration dictionary
     """
     default_config = {
@@ -61,11 +69,11 @@ def get_default_config():
         "port": 8000,
         "hash_mode": "sha256",
         "defenses": {
-            "rate_limit": "false",
-            "lockout": "false",
-            "captcha": "false",
-            "totp": "false",
-            "pepper": "false",
+            "rate_limit": False,
+            "lockout": False,
+            "captcha": False,
+            "totp": False,
+            "pepper": False,
         },
         "pepper_value": "",
         "group_seed": "519933725",
