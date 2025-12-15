@@ -6,16 +6,16 @@ SQLite database management for user authentication.
 import os
 import sqlite3
 
-import server_const as server_const
+import server_const as const
 
 
 def init_database():
     """
     Initialize SQLite database and create users table if it doesn't exist.
     """
-    os.makedirs(os.path.dirname(server_const.DB_PATH), exist_ok=True)
+    os.makedirs(os.path.dirname(const.DB_PATH), exist_ok=True)
 
-    conn = sqlite3.connect(server_const.DB_PATH)
+    conn = sqlite3.connect(const.DB_PATH)
     cursor = conn.cursor()
 
     cursor.execute(
@@ -44,7 +44,7 @@ def insert_user(username, password_hash, salt=None, totp_secret=None):
     :return: True if success, False if user already exists
     """
     try:
-        conn = sqlite3.connect(server_const.DB_PATH)
+        conn = sqlite3.connect(const.DB_PATH)
         cursor = conn.cursor()
 
         cursor.execute(
@@ -53,7 +53,7 @@ def insert_user(username, password_hash, salt=None, totp_secret=None):
         )
 
         conn.commit()
-        print(f"Username {username} was added to database at {server_const.DB_PATH}")
+        print(f"Username {username} was added to database at {const.DB_PATH}")
         return True
     except sqlite3.IntegrityError:
         # Username already exists
@@ -71,7 +71,7 @@ def get_user(username):
         or None if not found
     """
     try:
-        conn = sqlite3.connect(server_const.DB_PATH)
+        conn = sqlite3.connect(const.DB_PATH)
         cursor = conn.cursor()
 
         cursor.execute(
@@ -82,9 +82,6 @@ def get_user(username):
             """,
             (username,),
         )
-
-        user = cursor.fetchone()
-        conn.close()
-        return user
+        return cursor.fetchone()
     finally:
         conn.close()

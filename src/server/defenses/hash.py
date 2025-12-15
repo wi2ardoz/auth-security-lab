@@ -10,7 +10,8 @@ import os
 import bcrypt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
-from defenses import defenses_const
+
+from . import defenses_const as const
 
 
 def hash_password(password, hash_mode, salt=None, pepper=None):
@@ -24,9 +25,9 @@ def hash_password(password, hash_mode, salt=None, pepper=None):
     :return: Tuple (password_hash, salt)
         or (password_hash, None) for bcrypt/argon2id
     """
-    if hash_mode == defenses_const.HASH_SHA256:
+    if hash_mode == const.HASH_SHA256:
         if salt is None:
-            salt = os.urandom(defenses_const.SALT_SIZE_BYTES).hex()
+            salt = os.urandom(const.SALT_SIZE_BYTES).hex()
 
         combined = salt + password
         if pepper:
@@ -37,18 +38,18 @@ def hash_password(password, hash_mode, salt=None, pepper=None):
 
         return (password_hash, salt)
 
-    elif hash_mode == defenses_const.HASH_BCRYPT:
+    elif hash_mode == const.HASH_BCRYPT:
         password_with_pepper = password + pepper if pepper else password
 
         # Bcrypt generates salt internally
         password_hash = bcrypt.hashpw(
             password_with_pepper.encode(),
-            bcrypt.gensalt(rounds=defenses_const.BCRYPT_ROUNDS),
+            bcrypt.gensalt(rounds=const.BCRYPT_ROUNDS),
         ).decode()
 
         return (password_hash, None)
 
-    elif hash_mode == defenses_const.HASH_ARGON2ID:
+    elif hash_mode == const.HASH_ARGON2ID:
         password_with_pepper = password + pepper if pepper else password
 
         # Argon2 generates salt internally
@@ -72,21 +73,21 @@ def verify_password(password, stored_hash, hash_mode, salt=None, pepper=None):
     :param pepper: Pepper value (optional)
     :return: True if password matches, False otherwise
     """
-    if hash_mode == defenses_const.HASH_SHA256:
+    if hash_mode == const.HASH_SHA256:
         try:
             new_hash, _ = hash_password(password, hash_mode, salt, pepper)
             return new_hash == stored_hash
         except Exception:
             return False
 
-    elif hash_mode == defenses_const.HASH_BCRYPT:
+    elif hash_mode == const.HASH_BCRYPT:
         try:
             password_with_pepper = password + pepper if pepper else password
             return bcrypt.checkpw(password_with_pepper.encode(), stored_hash.encode())
         except (ValueError, Exception):
             return False
 
-    elif hash_mode == defenses_const.HASH_ARGON2ID:
+    elif hash_mode == const.HASH_ARGON2ID:
         try:
             ph = PasswordHasher()
             password_with_pepper = password + pepper if pepper else password
