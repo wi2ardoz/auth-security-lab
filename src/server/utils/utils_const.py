@@ -3,17 +3,9 @@ utils_const.py
 Configuration schema constants - JSON field names only.
 
 IMPORTANT: This file defines FIELD NAMES (keys), NOT VALUES.
-
-DON'T change these constants to configure the server.
-DO edit server_config.json or use CLI flags to configure.
-
-Example:
-- SCHEME_KEY_HASH_MODE = "hash_mode"  ← This is the FIELD NAME
-- To set hash mode to "bcrypt", edit server_config.json:
-{"hash_mode": "bcrypt", ...} or use: --hash bcrypt
-
 Only change these constants if you're modifying the config file schema itself
 or the default values used in case of fallbacks.
+DON'T change these constants to configure the server.
 """
 
 # Configuration file - Top level

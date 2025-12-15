@@ -85,3 +85,17 @@ def get_user(username):
         return cursor.fetchone()
     finally:
         conn.close()
+
+
+def clear_users_table():
+    """
+    Remove all records from the users table.
+    Useful for reseeding the database with new hashes.
+    """
+    try:
+        conn = sqlite3.connect(const.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users")
+        conn.commit()
+    finally:
+        conn.close()
