@@ -9,6 +9,7 @@ import os
 
 import bcrypt
 from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerifyMismatchError
 from defenses import defenses_const
 
 
@@ -23,7 +24,6 @@ def hash_password(password, hash_mode, salt=None, pepper=None):
     :return: Tuple (password_hash, salt)
         or (password_hash, None) for bcrypt/argon2id
     """
-
     if hash_mode == defenses_const.HASH_SHA256:
         if salt is None:
             salt = os.urandom(defenses_const.SALT_SIZE_BYTES).hex()
@@ -72,25 +72,28 @@ def verify_password(password, stored_hash, hash_mode, salt=None, pepper=None):
     :param pepper: Pepper value (optional)
     :return: True if password matches, False otherwise
     """
-    try:
-        if hash_mode == defenses_const.HASH_SHA256:
+    if hash_mode == defenses_const.HASH_SHA256:
+        try:
             new_hash, _ = hash_password(password, hash_mode, salt, pepper)
             return new_hash == stored_hash
+        except Exception:
+            return False
 
-        elif hash_mode == defenses_const.HASH_BCRYPT:
+    elif hash_mode == defenses_const.HASH_BCRYPT:
+        try:
             password_with_pepper = password + pepper if pepper else password
             return bcrypt.checkpw(password_with_pepper.encode(), stored_hash.encode())
+        except (ValueError, Exception):
+            return False
 
-        elif hash_mode == defenses_const.HASH_ARGON2ID:
+    elif hash_mode == defenses_const.HASH_ARGON2ID:
+        try:
             ph = PasswordHasher()
             password_with_pepper = password + pepper if pepper else password
             ph.verify(stored_hash, password_with_pepper)
             return True
+        except (VerifyMismatchError, InvalidHashError, Exception):
+            return False
 
-        else:
-            raise ValueError(f"Invalid hash mode: {hash_mode}")
-
-    except ValueError:
-        raise
-    except Exception:
-        return False
+    else:
+        raise ValueError(f"Invalid hash mode: {hash_mode}")
