@@ -1,0 +1,14 @@
+{
+    "host": "0.0.0.0",
+    "port": 8000,
+    "hash_mode": "sha256",
+    "defenses": {
+        "rate_limit": false,
+        "lockout": false,
+        "captcha": false,
+        "totp": false,
+        "pepper": false
+    },
+    "pepper_value": "my_secret_pepper_value",
+    "group_seed": "519933725"
+}
