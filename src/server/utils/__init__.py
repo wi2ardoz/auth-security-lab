@@ -3,13 +3,13 @@ __init__.py
 Server utilities for configuration, logging, and helpers.
 """
 
-from .cli import load_config_with_cli_overrides, parse_cli_args
+from .cli import init_from_cli, parse_cli_args
 from .utils_const import *
 
 __all__ = [
     # Functions
+    "init_from_cli",
     "parse_cli_args",
-    "load_config_with_cli_overrides",
     # Constants
     "SCHEME_KEY_HOST",
     "SCHEME_KEY_PORT",

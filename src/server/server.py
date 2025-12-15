@@ -11,7 +11,7 @@ from database import get_user, init_database, insert_user
 from defenses import hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from utils import load_config_with_cli_overrides, parse_cli_args, utils_const
+from utils import init_from_cli, parse_cli_args, utils_const
 
 
 # Request models
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     args = parse_cli_args()
 
     # Load config with CLI overrides
-    app.state.config = load_config_with_cli_overrides(const.CONFIG_PATH, args)
+    app.state.config = init_from_cli(const.CONFIG_PATH, args)
 
     # Start server
     host = app.state.config[utils_const.SCHEME_KEY_HOST]

@@ -18,13 +18,6 @@ def parse_cli_args():
     parser = argparse.ArgumentParser(
         description="Authentication Server - FastAPI + SQLite",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-            Examples:
-            python server.py
-            python server.py --hash bcrypt --pepper
-            python server.py --hash argon2id --pepper --rate-limit --lockout
-            python server.py --port 9000
-            """,
     )
 
     # Hash mode
@@ -55,14 +48,17 @@ def parse_cli_args():
     return parser.parse_args()
 
 
-def load_config_with_cli_overrides(config_path, args):
+def init_from_cli(config_path, args):
     """
-    Load configuration, merge with CLI arguments, and save if modified.
+    Initialize server configuration from file and CLI arguments.
+    Loads config, applies CLI overrides, saves if modified.
+    This is the main entry point for CLI-based configuration.
 
     :param config_path: Path to configuration file
     :param args: Parsed command-line arguments
     :return: Configuration dictionary
     """
+
     # Load or create config
     try:
         config = load_config(config_path)
