@@ -66,7 +66,7 @@ def init_from_cli(config_path, args):
         print(f"✓ Created default config at {config_path}")
 
     # Merge CLI arguments
-    config, modified = merge_cli_into_config(config, args)
+    config, modified = _merge_cli_into_config(config, args)
 
     # Save if modified
     if modified:
@@ -81,7 +81,7 @@ def init_from_cli(config_path, args):
     return config
 
 
-def merge_cli_into_config(config, args):
+def _merge_cli_into_config(config, args):
     """
     Merge command-line arguments into configuration.
 
