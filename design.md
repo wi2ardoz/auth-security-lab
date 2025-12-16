@@ -5,27 +5,29 @@
 ```
 +-------------+         HTTP          +-------------+
 |             |  ------------------>  |             |
-|  attacker   |  /login, /register    |   server    |
+| simulator   |  /login, /register    |   server    |
 |   (CLI)     |  <------------------  |  (FastAPI)  |
 |             |    JSON response      |             |
 +-------------+                       +-------------+
                                             |
                                             | writes
                                             v
-                                    +---------------+
-                                    | attempts.log  |
-                                    | (JSON lines)  |
-                                    +---------------+
-
-+-------------+
-|  simulator  |  Orchestrates server + attacker
-|   (CLI)     |  Runs experiments, generates summary
-+-------------+
+                                      +-------------+
+                                      | attempts_   |
+                                      | <hash>_     |
+                                      | <defenses>_ |
+                                      | <attack>.log|
+                                      +-------------+
 ```
+
+**Components:**
+- **server.py** - Authentication server (FastAPI)
+- **setup_db.py** - Database seeding from users.json
+- **simulator.py** - Attack orchestrator (manual + auto suite)
 
 ## Components
 
-### 1. server.py (Headless CLI)
+### 1. server.py (Authentication Server)
 
 Authentication server with configurable hash modes and defenses.
 
@@ -57,89 +59,117 @@ CLI flags define explicit experiment configurations and update the stored config
 | `python server.py --port 9000` | From config | From config | Only port updated |
 
 
-### 2. attacker.py (Headless CLI)
+### 2. setup_db.py (Database Seeder)
 
-Attack simulator for brute-force and password-spraying.
+Populates database with users from users.json using current server configuration.
 
-CLI flags:
+Behavior:
+- Reads server_config.json (hash mode, pepper setting)
+- Loads 30 users from users.json
+- Clears database
+- Hashes passwords with current configuration
+- Inserts users into database
+
+Usage:
+```bash
+python src/server/setup_db.py
 ```
---target <url>      Server URL (default: http://localhost:8000)
---attack <type>     brute_force | spray
---user <username>   Target user (for brute_force)
---wordlist <file>   Password list file
---max-attempts <n>  Limit attempts (default: 50000)
+
+Note: Can run while server is running (SQLite allows concurrent access).
+
+### 3. simulator.py (Attack Orchestrator)
+
+Two modes: manual attack OR automated experiment suite.
+
+**Manual Mode:**
+```bash
+python src/simulator/simulator.py --attack brute-force --target user01
+python src/simulator/simulator.py --attack password-spraying
+```
+CLI Flags:
+```
+--attack <type>     brute-force | password-spraying (manual mode)
+--target <user>     Target username (for brute-force in manual mode)
+```
+Note: Assumes server is already running and database is seeded.
+
+**Auto Suite Mode (Default):**
+```bash
+python src/simulator/simulator.py
 ```
 
-### 3. simulator.py (Interactive CLI)
-
-Menu-driven interface to run experiments.
-
-```
-Main Menu
----------
-1. Server Management
-2. Run Attack
-3. Run Full Experiment Suite
-4. Exit
-
-Server Management
------------------
-1. Start Server
-2. Stop Server
-3. Configure Hash Mode
-4. Configure Defenses
-5. Back
-
-Run Attack
-----------
-1. Brute-Force Attack
-2. Password-Spray Attack
-3. Back
-```
+Runs all combinations of hash × defenses × attacks automatically.
 
 ## Data Flow
 
-### Manual Attack (Menu options 1 + 2)
+### Manual Workflow
 
 ```
-1. User configures server (hash + defenses)
-2. User starts server
-3. User runs attack (brute_force or spray)
-4. Server logs each attempt to:
-   src/logs/attempts/attempts_<hash>_<defenses>.log
-5. Attack ends, simulator renames log to:
-   attempts_<hash>_<defenses>_<attack_type>.log
+Terminal 1: Start server with configuration
+  $ python src/server/server.py --hash bcrypt --pepper --rate-limit
+
+Terminal 2: Seed database (optional - or use /register API)
+  $ python src/server/setup_db.py
+
+Terminal 3: Run single attack
+  $ python src/simulator/simulator.py --attack brute-force --target user01
+
+Server logs to: src/logs/attempts/attempts_<hash>_<defenses>.log
+After attack completes, log is renamed to include attack type.
 ```
 
-### Full Experiment Suite (Menu option 3)
+### Automated Test Suite Workflow
 
 ```
-1. User selects "Run Full Experiment Suite"
-2. Simulator loops through all combinations:
-   For each hash mode (sha256, bcrypt, argon2id):
-     For each defense combination:
-       For each attack type (brute_force, spray):
-         a. Simulator starts server with config
-         b. Simulator runs attacker
-         c. Server logs attempts
-         d. Simulator renames log with attack type
-         e. Simulator stops server
-3. Simulator generates summary.csv from all logs
-4. Done
+$ python src/simulator/simulator.py
+
+Behind the scenes:
+  For each hash_mode in [sha256, bcrypt, argon2id]:
+    For each defense_combo in [none, pepper, rate-limit, ...]:
+      For each attack_type in [brute-force, password-spraying]:
+        1. Start server: python server.py --hash <mode> <defenses> &
+        2. Seed database: python setup_db.py
+        3. Wait for server ready
+        4. Run attack via HTTP requests to /login
+        5. Stop server
+        6. Rename log: attempts_<hash>_<defenses>.log ->
+                       attempts_<hash>_<defenses>_<attack>.log
+        7. Move log to suite directory
+
+  After all experiments:
+    Generate summary.csv from all logs
 ```
 
 ## Log Format
 
-### attempts.log (JSON lines)
+### Directory Structure
 
-Location: src/logs/attempts/attempts_<hash>_<defenses>_<attack>.log
-
-Example filename: attempts_bcrypt_ratelimit_pepper_bruteforce.log
-
-Fields per line:
 ```
+src/logs/
+|-- suite_20250116_143022/          # Auto suite mode
+|   |-- attempts_sha256_none_bruteforce.log
+|   |-- attempts_sha256_none_passwordspraying.log
+|   |-- attempts_sha256_pepper_bruteforce.log
+|   |-- attempts_bcrypt_none_bruteforce.log
+|   |-- attempts_bcrypt_pepper_bruteforce.log
+|   |-- ...
+|   +-- summary.csv                 # Aggregate statistics
+|
+|-- suite_20250116_151500/          # Next suite run
+    |-- attempts_*.log
+    +-- summary.csv
+```
+
+**Manual mode:** Logs go to `src/logs/attempts/attempts_<hash>_<defenses>_<attack>.log`
+
+### attempts_*.log Format (JSON lines)
+
+Example filename: `attempts_bcrypt_pepper_ratelimit_bruteforce.log`
+
+Each line is a JSON object representing one authentication attempt:
+```json
 {
-  "timestamp": "2024-12-09T15:30:45.123Z",
+  "timestamp": "2025-01-16T15:30:45.123Z",
   "username": "user01",
   "hash_mode": "bcrypt",
   "protection_flags": {
@@ -155,9 +185,9 @@ Fields per line:
 }
 ```
 
-### summary.csv
+### summary.csv Format
 
-Location: src/logs/summary/summary.csv
+Location: Inside each suite directory (e.g., `suite_20250116_143022/summary.csv`)
 
 Columns:
 ```
@@ -234,7 +264,7 @@ Location: src/server/config/server_config.json
 ## Report Generation
 
 Steps:
-1. List all files in src/logs/attempts/
+1. List all files in src/logs/suite_DATE_HOUR/
 2. For each log file:
    - Parse filename for hash_mode, defenses, attack_type
    - Read JSON lines

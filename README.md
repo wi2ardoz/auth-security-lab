@@ -61,31 +61,33 @@ Project/
 |   |   |-- database.py             # SQLite database management
 |   |   |-- server.py               # Auth server (FastAPI + SQLite)
 |   |   |-- server_const.py         # Server constants
-|   |   |-- setup_db.py             # DB initialization
+|   |   |-- setup_db.py             # Database seeder from users.json
 |   |   |-- config/
 |   |   |   +-- server_config.json  # Hash mode + defense toggles
 |   |   |-- db/                     # SQLite database
+|   |   |   +-- auth.db
 |   |   |-- defenses/               # Defense implementations
-|   |   +-- utils/                  # Server utilities helpers
+|   |   |   |-- hash.py             # Password hashing (sha256/bcrypt/argon2id)
+|   |   |   +-- defenses_const.py   # Defense constants
+|   |   +-- utils/                  # Server utilities
+|   |       |-- config.py           # Config load/save
+|   |       |-- cli.py              # CLI parsing
+|   |       +-- utils_const.py      # Config schema constants
 |   |
-|   |-- attacker/
-|   |   |-- attacker.py             # Attack client (brute-force, spray)
-|   |   +-- attacker_const.py       # Attacker constants
+|   |-- simulator/
+|   |   +-- simulator.py            # Attack orchestrator (manual + auto suite)
 |   |
 |   |-- data/
 |   |   +-- users.json              # 30 test accounts (weak/medium/strong)
 |   |
-|   |-- logs/
-|   |   |-- attempts/               # Raw attempt logs per experiment
-|   |   |   |-- .
-|   |   |   |-- .
-|   |   |   +-- attempts_<hash>_<defenses>_<attack>.log
-|   |   |
-|   |   +-- summary/
-|   |       +-- summary.csv         # Aggregated results from all experiments
-|   |
-|   |-- simulator.py                # Interactive CLI menu
-|   +-- simulator_const.py          # Simulator constants
+|   +-- logs/
+|       |-- suite_20250116_143022/  # Auto suite results
+|       |   |-- attempts_sha256_none_bruteforce.log
+|       |   |-- attempts_bcrypt_pepper_bruteforce.log
+|       |   +-- summary.csv
+|       |
+|       +-- suite_20250116_151500/  # Next suite run
+|           +-- ...
 |
 |-- requirements.txt
 |-- design.md
@@ -108,17 +110,40 @@ pip install <package-name>
 pip freeze > requirements.txt
 ```
 
-### Running the Simulator (Recommended)
+## Usage
+
+### Automated Test Suite (Recommended)
+
+Run all experiments automatically:
 
 ```bash
-python src/simulator.py
+python src/simulator/simulator.py
 ```
 
-### Manual Execution (Advanced)
+**Output:**
+- Interactive prompt with experiment info
+- Real-time progress for each experiment
+- Results saved to `src/logs/suite_<timestamp>/`
+- Generates `summary.csv` with aggregate statistics
 
-Run server with specific configuration:
+**What it does:**
+- Tests all combinations: 3 hash modes × 5 defense configs × 2 attack types = 30 experiments
+- For each experiment:
+  1. Starts server with specific configuration
+  2. Seeds database with users.json
+  3. Runs attack (brute-force or password-spraying)
+  4. Collects logs
+  5. Stops server
+- Estimated time: 2-4 hours
+
+---
+
+### Manual Execution (Single Experiment)
+
+**Step 1: Start server with configuration**
+
 ```bash
-python src/server/server.py --hash bcrypt --rate-limit --lockout --pepper
+python src/server/server.py --hash bcrypt --pepper --rate-limit
 ```
 
 Server flags:
@@ -133,29 +158,35 @@ Server flags:
 ```
 
 **Configuration Behavior:**
-CLI flags define explicit experiment configurations and update `server_config.json`.
+CLI flags update `server_config.json` and define experiment configuration.
 
 | CLI Arguments | Hash Mode | Defenses | Config Update |
 |---------------|-----------|----------|---------------|
-| `python server.py` | From config | From config | No change (uses stored config) |
+| `python server.py` | From config | From config | No change |
 | `python server.py --hash sha256` | sha256 | All disabled | Hash updated, defenses cleared |
-| `python server.py --hash bcrypt --pepper` | bcrypt | Only pepper enabled | Both updated explicitly |
-| `python server.py --pepper --rate-limit` | From config | Only specified enabled | Defenses updated, hash kept |
-| `python server.py --port 9000` | From config | From config | Only port updated |
+| `python server.py --hash bcrypt --pepper` | bcrypt | Only pepper | Both updated |
+| `python server.py --pepper --rate-limit` | From config | Only specified | Defenses updated |
 
-Run attacker against the server:
+**Step 2: Seed database (Optional)**
+
 ```bash
-python src/attacker/attacker.py --target http://localhost:8000 --attack brute_force --user user01
-python src/attacker/attacker.py --target http://localhost:8000 --attack spray --wordlist common.txt
+# Option A: Use setup_db.py (seeds all 30 users)
+python src/server/setup_db.py
+
+# Option B: Use /register API (manual registration)
+curl -X POST http://localhost:8000/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"user01","password":"123456"}'
 ```
 
-Attacker flags:
-```
---target <url>      Server URL (default: http://localhost:8000)
---attack <type>     brute_force | spray
---user <username>   Target user (for brute_force)
---wordlist <file>   Password list file
---max-attempts <n>  Limit attempts (default: 50000)
+**Step 3: Run attack**
+
+```bash
+# Brute-force attack on single user
+python src/simulator/simulator.py --attack brute-force --target user01
+
+# Password-spraying attack on all users
+python src/simulator/simulator.py --attack password-spraying
 ```
 
 ### Deactivating Environment
