@@ -4,6 +4,7 @@ FastAPI server for user registration and login with SQLite database.
 """
 
 import sqlite3
+import time
 
 import server_const as const
 import uvicorn
@@ -11,7 +12,8 @@ from database import get_user, init_database, insert_user
 from defenses import hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from utils import get_hash_settings, init_from_cli, parse_cli_args, utils_const
+from utils import (get_hash_settings, get_next_log_filename, init_from_cli,
+                   init_log_file, log_attempt, parse_cli_args, utils_const)
 
 
 # Request models
@@ -69,8 +71,11 @@ async def register_user(request: RegisterRequest):
 @app.post("/login")
 async def login_user(request: LoginRequest):
     try:
+        start_time = time.time()
+
         user = get_user(request.username)
         if user is None:
+            _log_attempt(request.username, start_time, const.LOG_RESULT_FAILURE)
             return {
                 "status": const.SERVER_FAILURE,
                 "message": const.SERVER_MSG_LOGIN_INVALID,
@@ -83,12 +88,15 @@ async def login_user(request: LoginRequest):
         verified = verify_password(
             request.password, password_hash, hash_mode, salt=salt, pepper=pepper
         )
+
         if verified:
+            _log_attempt(request.username, start_time, const.LOG_RESULT_SUCCESS)
             return {
                 "status": const.SERVER_SUCCESS,
                 "message": const.SERVER_MSG_LOGIN_OK,
             }
         else:
+            _log_attempt(request.username, start_time, const.LOG_RESULT_FAILURE)
             return {
                 "status": const.SERVER_FAILURE,
                 "message": const.SERVER_MSG_LOGIN_INVALID,
@@ -109,6 +117,18 @@ async def login_totp_user(request: LoginTOTPRequest):
     }
 
 
+def _log_attempt(username, start_time, result):
+    """
+    Helper function to log authentication attempt with automatic latency calculation.
+
+    :param username: Username attempted
+    :param start_time: Request start time from time.time()
+    :param result: const.LOG_RESULT_SUCCESS or const.LOG_RESULT_FAILURE
+    """
+    latency_ms = (time.time() - start_time) * 1000
+    log_attempt(app.state.log_filepath, username, result, latency_ms, app.state.config)
+
+
 if __name__ == "__main__":
 
     # Initialize database
@@ -119,6 +139,12 @@ if __name__ == "__main__":
 
     # Load config with CLI overrides
     app.state.config = init_from_cli(const.CONFIG_PATH, args)
+
+    # Initialize logging
+    log_filepath = get_next_log_filename(app.state.config)
+    init_log_file(log_filepath)
+    app.state.log_filepath = log_filepath
+    print(f"✓ Logging to: {log_filepath}")
 
     # Start server
     host = app.state.config[utils_const.SCHEME_KEY_HOST]

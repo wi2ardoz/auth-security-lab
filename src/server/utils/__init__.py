@@ -5,6 +5,7 @@ Server utilities for configuration, logging, and helpers.
 
 from .cli import init_from_cli, parse_cli_args
 from .config import get_hash_settings, load_config, save_config
+from .logger import get_next_log_filename, init_log_file, log_attempt
 from .utils_const import *
 
 __all__ = [
@@ -14,6 +15,9 @@ __all__ = [
     "get_hash_settings",
     "load_config",
     "save_config",
+    "get_next_log_filename",
+    "init_log_file",
+    "log_attempt",
     # Constants
     "SCHEME_KEY_HOST",
     "SCHEME_KEY_PORT",
