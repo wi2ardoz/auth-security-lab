@@ -24,8 +24,7 @@ from pathlib import Path
 import server_const as const
 from database import clear_users_table, init_database, insert_user
 from defenses import hash_password
-from utils import utils_const
-from utils.config import load_config
+from utils import get_hash_settings, load_config
 
 
 def load_users_from_json(json_path):
@@ -47,23 +46,6 @@ def load_users_from_json(json_path):
         raise ValueError(f"Invalid users.json: missing 'users' key")
 
     return data["users"]
-
-
-def get_hash_settings(config):
-    """
-    Extract hash mode and pepper from configuration.
-
-    :param config: Configuration dictionary
-    :return: Tuple (hash_mode, pepper_value_or_none)
-    """
-    hash_mode = config[utils_const.SCHEME_KEY_HASH_MODE]
-
-    pepper_enabled = config[utils_const.SCHEME_KEY_DEFENSES][
-        utils_const.SCHEME_KEY_DEFENSE_PEPPER
-    ]
-    pepper = config[utils_const.SCHEME_KEY_PEPPER_VALUE] if pepper_enabled else None
-
-    return hash_mode, pepper
 
 
 def populate_database(users, hash_mode, pepper):

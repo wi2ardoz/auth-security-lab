@@ -72,3 +72,16 @@ def get_default_config():
         const.SCHEME_KEY_PEPPER_VALUE: const.SCHEME_VALUE_PEPPER_DEFAULT,
         const.SCHEME_KEY_GROUP_SEED: const.SCHEME_VALUE_GROUP_SEED_DEFAULT,
     }
+
+
+def get_hash_settings(config):
+    """
+    Get hash mode and pepper settings from config.
+    :return: Tuple of (hash_mode, pepper)
+    """
+    hash_mode = config[const.SCHEME_KEY_HASH_MODE]
+
+    pepper_enabled = config[const.SCHEME_KEY_DEFENSES][const.SCHEME_KEY_DEFENSE_PEPPER]
+    pepper = config[const.SCHEME_KEY_PEPPER_VALUE] if pepper_enabled else None
+
+    return hash_mode, pepper

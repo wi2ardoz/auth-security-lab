@@ -11,7 +11,7 @@ from database import get_user, init_database, insert_user
 from defenses import hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from utils import init_from_cli, parse_cli_args, utils_const
+from utils import get_hash_settings, init_from_cli, parse_cli_args, utils_const
 
 
 # Request models
@@ -39,7 +39,7 @@ app = FastAPI()
 async def register_user(request: RegisterRequest):
     try:
         # Retrieve hash settings from config
-        hash_mode, pepper = access_hash_settings()
+        hash_mode, pepper = get_hash_settings(app.state.config)
 
         # Hash the password generate a salt as needed
         password_hash, salt = hash_password(
@@ -78,7 +78,7 @@ async def login_user(request: LoginRequest):
         username, password_hash, salt, totp_secret = user
 
         # Retrieve hash settings from config
-        hash_mode, pepper = access_hash_settings()
+        hash_mode, pepper = get_hash_settings(app.state.config)
 
         verified = verify_password(
             request.password, password_hash, hash_mode, salt=salt, pepper=pepper
@@ -107,23 +107,6 @@ async def login_totp_user(request: LoginTOTPRequest):
         "status": const.SERVER_FAILURE,
         "message": "TOTP not implemented yet",
     }
-
-
-def access_hash_settings():
-    """
-    Access hash mode and pepper settings from app state.
-    :return: Tuple of (hash_mode, pepper)
-    """
-    config = app.state.config
-
-    hash_mode = config[utils_const.SCHEME_KEY_HASH_MODE]
-
-    pepper_enabled = config[utils_const.SCHEME_KEY_DEFENSES][
-        utils_const.SCHEME_KEY_DEFENSE_PEPPER
-    ]
-    pepper = config[utils_const.SCHEME_KEY_PEPPER_VALUE] if pepper_enabled else None
-
-    return hash_mode, pepper
 
 
 if __name__ == "__main__":

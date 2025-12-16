@@ -31,15 +31,11 @@ def parse_cli_args():
     parser.add_argument(
         "--rate-limit", action="store_true", help="Enable rate limiting"
     )
-
     parser.add_argument("--lockout", action="store_true", help="Enable account lockout")
-
     parser.add_argument(
         "--captcha", action="store_true", help="Enable CAPTCHA simulation"
     )
-
     parser.add_argument("--totp", action="store_true", help="Enable TOTP requirement")
-
     parser.add_argument("--pepper", action="store_true", help="Enable pepper")
 
     # Server settings
@@ -58,7 +54,6 @@ def init_from_cli(config_path, args):
     :param args: Parsed command-line arguments
     :return: Configuration dictionary
     """
-
     # Load or create config
     try:
         config = load_config(config_path)
