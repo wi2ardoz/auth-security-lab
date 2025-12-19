@@ -134,7 +134,7 @@ python src/simulator/simulator.py
   3. Runs attack (brute-force or password-spraying)
   4. Collects logs
   5. Stops server
-- Estimated time: 2-4 hours
+- Estimated time: 2 hours
 
 ---
 
@@ -222,7 +222,7 @@ Unique identifier for each team, calculated as: `SEED_GROUP = ID1 XOR ID2` (bitw
 - Argon2id (time = 1, memory = 64 MB, parallelism = 1)
 
 ### 3. Protection Mechanisms
-- Rate limiting (per-user and global)
+- Rate limiting
 - Account lockout
 - CAPTCHA (simulated)
 - TOTP
@@ -253,14 +253,21 @@ Unique identifier for each team, calculated as: `SEED_GROUP = ID1 XOR ID2` (bitw
 
 | Week | Task | Deliverable |
 |------|------|-------------|
-| 1 | Literature review, tool selection, Server setup | Server App + Basic logs | 
-| 2 | Client CLI setup, User dataset creation, Brute-Force & Password-Spraying testing | Client App + Attack logs + Interim report |
+| 1 | Literature review, tool selection, Server setup, User dataset creation | Server App + Basic logs | 
+| 2 | Simulator, Brute-Force & Password-Spraying testing | Client App + Attack logs + Interim report |
 | 3 | Add protection mechanisms (Rate-Limit, Pepper, TOTP, CAPTCHA), repeat tests | Complete logs + Analysis data |
 | 4-5 | Data analysis, report writing, presentation, and demo video | Final submission (Report, Presentation, Video) |
 
 ## Version History
 
-- **v1.0.0** (Initial Release) - Project setup and documentation
+- **v2.0**
+  - Added FastAPI-based auth server with CLI configuration and SQLite DB
+  - Database seeder: src/server/setup_db.py (imports 30 test accounts from src/data/users.json)
+  - Password hashing implementations: SHA-256+salt, bcrypt, Argon2id
+  - Global pepper support and per-user salt handling
+  - Structured server logging: login attempts
+  - Config management: src/server/config/server_config.json
+- **v1.0** (Initial Release) - Project setup and documentation
   - Python project structure initialized
   - Virtual environment configured
   - README and design documents created
