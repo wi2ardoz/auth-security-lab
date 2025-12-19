@@ -1,0 +1,185 @@
+{
+    "users": [
+        {
+            "username": "user01",
+            "password": "123456",
+            "category": "weak",
+            "totp_secret": "Y3QNUNCSACM6P3DLI46Q2FK6A5NDMZNJ"
+        },
+        {
+            "username": "user02",
+            "password": "password",
+            "category": "weak",
+            "totp_secret": "RUFCBHLL6KCJCR3FJLDPYTA2TE5E7PGC"
+        },
+        {
+            "username": "user03",
+            "password": "qwerty123",
+            "category": "weak",
+            "totp_secret": "RB2TOUCVIOGYVMOYCJRO52QRQVXZFHEU"
+        },
+        {
+            "username": "user04",
+            "password": "letmein",
+            "category": "weak",
+            "totp_secret": "AUDMEUGEVMIX5DCSGQYSU7UEUR66O7YW"
+        },
+        {
+            "username": "user05",
+            "password": "519933725",
+            "category": "weak",
+            "totp_secret": "76XROE6XPOVJO6SH7ZHV6Z3ZEIZTT6EN"
+        },
+        {
+            "username": "user06",
+            "password": "welcome1",
+            "category": "weak",
+            "totp_secret": "IUEZRBHA2TBOWCTH4263KMNDXGOSNZSG"
+        },
+        {
+            "username": "user07",
+            "password": "abc12345",
+            "category": "weak",
+            "totp_secret": "HOD232WWCZKJKHZF3OPLQ5OQL4EJK2EQ"
+        },
+        {
+            "username": "user08",
+            "password": "iloveyou",
+            "category": "weak",
+            "totp_secret": "5WCHCD4IUD2E5ID2KVRM35SLW2FWVRGD"
+        },
+        {
+            "username": "user09",
+            "password": "dragon99",
+            "category": "weak",
+            "totp_secret": "CNYKSWKZ7XS6CF2KQXPAAHKVLS36U7RN"
+        },
+        {
+            "username": "user10",
+            "password": "sunshine",
+            "category": "weak",
+            "totp_secret": "HXQOHJN4OYNYR2FXMG6R2URJUUJ773UN"
+        },
+        {
+            "username": "user11",
+            "password": "Summer24!",
+            "category": "medium",
+            "totp_secret": "IKZEMACPGQ7MRXCTXLSZD6EMMOXHVHUI"
+        },
+        {
+            "username": "user12",
+            "password": "Winter#2024",
+            "category": "medium",
+            "totp_secret": "AVKTEWPVEKSNO7JLKGWRTPMDMB7DD6BX"
+        },
+        {
+            "username": "user13",
+            "password": "BlueSky77?",
+            "category": "medium",
+            "totp_secret": "A6U4KKI2AI3P4OJLCNKKOTTRXG6F6LVF"
+        },
+        {
+            "username": "user14",
+            "password": "MyD0g&Cat!",
+            "category": "medium",
+            "totp_secret": "R4Y36UE7XFOCSJQOYVICZ2PUN4BLPPDQ"
+        },
+        {
+            "username": "user15",
+            "password": "GalaxyDoor12",
+            "category": "medium",
+            "totp_secret": "3YON42QRGIIGNDSIPND7AUYUJQNS5WK4"
+        },
+        {
+            "username": "user16",
+            "password": "Orange-Cloud9",
+            "category": "medium",
+            "totp_secret": "GN7RQ2SANH2XOLKISVLGSXMMGJB6E5L5"
+        },
+        {
+            "username": "user17",
+            "password": "TravelTime55",
+            "category": "medium",
+            "totp_secret": "5SSMGK6MQLTH6KNZHF5BXLKCH7FIXWMW"
+        },
+        {
+            "username": "user18",
+            "password": "CoffeeBean88",
+            "category": "medium",
+            "totp_secret": "OVEOPKRJAHHY7LZ3HOFM7U5XO3G6KOTZ"
+        },
+        {
+            "username": "user19",
+            "password": "SilverWave21",
+            "category": "medium",
+            "totp_secret": "T7BQHSRP74ANU7MISQHG7KROAXLPYPAA"
+        },
+        {
+            "username": "user20",
+            "password": "NightOwl#63",
+            "category": "medium",
+            "totp_secret": "CRDWTLZDKT72U5PQCO3KVKDFJOQHSWQR"
+        },
+        {
+            "username": "user21",
+            "password": "Crimson!Falcon927",
+            "category": "strong",
+            "totp_secret": "VFZENSJPPMMNR7DM3RNRLW7E72NMOCPN"
+        },
+        {
+            "username": "user22",
+            "password": "L0ck$tep_Voyage420",
+            "category": "strong",
+            "totp_secret": "EFZM2TJYVFF6DUKHPKD4VUDOS656NDBJ"
+        },
+        {
+            "username": "user23",
+            "password": "Aurora!Shield58#",
+            "category": "strong",
+            "totp_secret": "PH4NJZMMBYJ36GCFC24AILSB5HI7ZX4T"
+        },
+        {
+            "username": "user24",
+            "password": "Nebula^Signal003",
+            "category": "strong",
+            "totp_secret": "JQGGKOJT647KS5R7ZMYH7YWDVJDVEBUL"
+        },
+        {
+            "username": "user25",
+            "password": "Quartz&Basilisk77",
+            "category": "strong",
+            "totp_secret": "QXTJ6C2I32MVW2AG6FUVJEUO7NMWLQUL"
+        },
+        {
+            "username": "user26",
+            "password": "Ironclad-Delta59!",
+            "category": "strong",
+            "totp_secret": "U3RCI6MNUCC3GIKTSWLIDLB5XSR66WFU"
+        },
+        {
+            "username": "user27",
+            "password": "Starlit+Harbor906",
+            "category": "strong",
+            "totp_secret": "NBLJXK7CKF6FLMNGUIX255BLFKAVQZRZ"
+        },
+        {
+            "username": "user28",
+            "password": "TidalForce@Zen444",
+            "category": "strong",
+            "totp_secret": "JINQCD2CLVTEF4PM3PBGQHQLLZTLBPZB"
+        },
+        {
+            "username": "user29",
+            "password": "Vortex_Garden771!",
+            "category": "strong",
+            "totp_secret": "ISHCA2GVOTAIWMACA3NTSWGSRZUNKQQR"
+        },
+        {
+            "username": "user30",
+            "password": "Mythic*Cipher2024",
+            "category": "strong",
+            "totp_secret": "B53XRDKZVY6OZV3DIMU6KNZN4JZ22Q6R"
+        }
+    ],
+    "group_seed": "519933725"
+}
