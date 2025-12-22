@@ -3,11 +3,9 @@ attacks.py
 Attack simulation methods for testing authentication server security.
 """
 
-import json
 import os
 import sys
 import time
-from datetime import datetime, timezone
 from typing import List, Dict
 
 import requests
@@ -57,7 +55,7 @@ def password_spraying(
     server_url: str,
     usernames: List[str],
     passwords: List[str] = None
-) -> Dict[str, any]:
+):
     """
     Simulate a password spraying attack.
     
@@ -68,19 +66,9 @@ def password_spraying(
     :param server_url: Base URL of the authentication server (e.g., "http://localhost:8000")
     :param usernames: List of usernames to target
     :param passwords: List of passwords to try (defaults to COMMON_PASSWORDS)
-    :return: Dictionary with attack results including successful credentials
     """
     if passwords is None:
         passwords = const.COMMON_PASSWORDS
-    
-    results = {
-        "attack_type": const.ATTACK_TYPE_PASSWORD_SPRAYING,
-        "total_attempts": 0,
-        "successful_logins": [],
-        "failed_attempts": 0,
-        "start_time": time.time(),
-        "end_time": None,
-    }
     
     login_url = f"{server_url}/login"
     
@@ -94,8 +82,6 @@ def password_spraying(
         print(f"\n[*] Trying password: '{password}'")
         
         for username in usernames:
-            results["total_attempts"] += 1
-            
             try:
                 response = requests.post(
                     login_url,
@@ -107,28 +93,11 @@ def password_spraying(
                     data = response.json()
                     if data.get("status") == "success":
                         print(f"[+] SUCCESS! Username: '{username}' Password: '{password}'")
-                        results["successful_logins"].append({
-                            "username": username,
-                            "password": password,
-                            "attempt_number": results["total_attempts"]
-                        })
-                    else:
-                        results["failed_attempts"] += 1
-                else:
-                    results["failed_attempts"] += 1
                     
             except requests.exceptions.RequestException as e:
                 print(f"[!] Error connecting to server: {e}")
-                results["failed_attempts"] += 1
     
-    results["end_time"] = time.time()
-    results["duration_seconds"] = results["end_time"] - results["start_time"]
-    
-    print(f"\n[*] Attack completed in {results['duration_seconds']:.2f} seconds")
-    print(f"[*] Successful logins: {len(results['successful_logins'])}")
-    print(f"[*] Failed attempts: {results['failed_attempts']}")
-    
-    return results
+    print(f"\n[*] Attack completed")
 
 
 def brute_force_attack(
@@ -136,7 +105,7 @@ def brute_force_attack(
     target_username: str,
     password_list: List[str] = None,
     max_attempts: int = None
-) -> Dict[str, any]:
+):
     """
     Simulate a brute force attack against a specific user.
     
@@ -147,21 +116,10 @@ def brute_force_attack(
     :param target_username: Username to target
     :param password_list: List of passwords to try (defaults to COMMON_PASSWORDS + generated variations)
     :param max_attempts: Maximum number of attempts before stopping (None for unlimited)
-    :return: Dictionary with attack results including successful password if found
     """
     if password_list is None:
         # Use common passwords plus some variations
         password_list = const.COMMON_PASSWORDS + _generate_password_variations(target_username)
-    
-    results = {
-        "attack_type": const.ATTACK_TYPE_BRUTE_FORCE,
-        "target_username": target_username,
-        "total_attempts": 0,
-        "successful_password": None,
-        "failed_attempts": 0,
-        "start_time": time.time(),
-        "end_time": None,
-    }
     
     login_url = f"{server_url}/login"
     
@@ -170,13 +128,14 @@ def brute_force_attack(
     print(f"[*] Target username: '{target_username}'")
     print(f"[*] Password list size: {len(password_list)}")
     
+    attempts = 0
     for i, password in enumerate(password_list, 1):
         # Check if we've reached max_attempts
-        if max_attempts and results["total_attempts"] >= max_attempts:
+        if max_attempts and attempts >= max_attempts:
             print(f"\n[*] Reached maximum attempts limit ({max_attempts})")
             break
         
-        results["total_attempts"] += 1
+        attempts += 1
         
         if i % 10 == 0:
             print(f"[*] Progress: {i}/{len(password_list)} attempts...")
@@ -192,28 +151,14 @@ def brute_force_attack(
                 data = response.json()
                 if data.get("status") == "success":
                     print(f"\n[+] SUCCESS! Password found: '{password}'")
-                    print(f"[+] Cracked after {results['total_attempts']} attempts")
-                    results["successful_password"] = password
-                    
-                    results["end_time"] = time.time()
-                    results["duration_seconds"] = results["end_time"] - results["start_time"]
-                    return results
-                else:
-                    results["failed_attempts"] += 1
-            else:
-                results["failed_attempts"] += 1
+                    print(f"[+] Cracked after {attempts} attempts")
+                    return
                 
         except requests.exceptions.RequestException as e:
             print(f"[!] Error connecting to server: {e}")
-            results["failed_attempts"] += 1
     
-    results["end_time"] = time.time()
-    results["duration_seconds"] = results["end_time"] - results["start_time"]
-    
-    print(f"\n[*] Attack completed in {results['duration_seconds']:.2f} seconds")
-    print(f"[*] Password NOT found after {results['total_attempts']} attempts")
-    
-    return results
+    print(f"\n[*] Attack completed")
+    print(f"[*] Password NOT found after {attempts} attempts")
 
 
 def _generate_password_variations(username: str = None) -> List[str]:
@@ -272,21 +217,20 @@ def dictionary_attack(
     server_url: str,
     target_username: str,
     dictionary_file: str
-) -> Dict[str, any]:
+):
     """
     Simulate a dictionary attack using passwords from a file.
     
     :param server_url: Base URL of the authentication server
     :param target_username: Username to target
     :param dictionary_file: Path to file containing passwords (one per line)
-    :return: Dictionary with attack results
     """
     try:
         with open(dictionary_file, 'r', encoding='utf-8') as f:
             password_list = [line.strip() for line in f if line.strip()]
     except FileNotFoundError:
         print(f"[!] Dictionary file not found: {dictionary_file}")
-        return {"error": "Dictionary file not found"}
+        return
     
     print(f"[*] Loaded {len(password_list)} passwords from dictionary")
-    return brute_force_attack(server_url, target_username, password_list)
+    brute_force_attack(server_url, target_username, password_list)
