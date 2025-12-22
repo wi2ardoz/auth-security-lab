@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from server.utils.config import load_config
 from server.utils import utils_const
+from server.server_const import CONFIG_PATH
 
 
 def load_server_config(config_path: str = None) -> Dict:
@@ -29,10 +30,7 @@ def load_server_config(config_path: str = None) -> Dict:
     :return: Configuration dictionary
     """
     if config_path is None:
-        # Default config path
-        config_path = os.path.join(
-            os.path.dirname(__file__), '..', 'server', 'config', 'server_config.json'
-        )
+        config_path = utils_const.CONFIG_PATH
     
     config = load_config(config_path)
     return config
