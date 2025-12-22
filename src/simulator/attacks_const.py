@@ -3,17 +3,7 @@ attacks_const.py
 Constants for attack simulation methods.
 """
 
-# Attack types
-ATTACK_TYPE_PASSWORD_SPRAYING = "password_spraying"
-ATTACK_TYPE_BRUTE_FORCE = "brute_force"
-ATTACK_TYPE_DICTIONARY = "dictionary"
-
-# Log directory
-LOG_DIR_ATTACKS = "attacks"
-
 # Default values
-DEFAULT_DELAY = 0.1
-DEFAULT_TIMEOUT = 5
 DEFAULT_LOCALHOST = "localhost"
 DEFAULT_SERVER_BIND_ADDRESS = "0.0.0.0"
 
