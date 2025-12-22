@@ -6,6 +6,8 @@ Constants for attack simulation methods.
 # Default values
 DEFAULT_LOCALHOST = "localhost"
 DEFAULT_SERVER_BIND_ADDRESS = "0.0.0.0"
+DEFAULT_TIMEOUT = 10  # seconds
+
 
 # Common passwords for password spraying attack
 COMMON_PASSWORDS = [
