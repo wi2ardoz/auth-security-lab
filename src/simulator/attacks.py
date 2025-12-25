@@ -5,9 +5,8 @@ Attack simulation methods for testing authentication server security.
 
 import os
 import sys
-import time
 from typing import List, Dict
-
+import json
 import requests
 
 import attacks_const as const
@@ -50,11 +49,24 @@ def get_server_url_from_config(config: Dict) -> str:
     
     return f"http://{host}:{port}"
 
-
+def load_passwords_from_file(file_path: str = None) -> List[str]:
+    """
+    Load passwords from JSON file.
+    
+    :param file_path: Path to passwords JSON file (defaults to const.PASSWORDS_FILE_PATH)
+    :return: List of passwords
+    """
+    with open(file_path, 'r', encoding='utf-8') as f:
+        passwords = json.load(f)
+        
+        print(f"[*] Loaded {len(passwords)} passwords from {file_path}")
+        return passwords
+    
 def password_spraying(
     server_url: str,
     usernames: List[str],
-    passwords: List[str] = None
+    passwords: List[str] = None,
+    endpoint: str = "/login"
 ):
     """
     Simulate a password spraying attack.
@@ -70,7 +82,7 @@ def password_spraying(
     if passwords is None:
         passwords = const.COMMON_PASSWORDS
     
-    login_url = f"{server_url}/login"
+    login_url = f"{server_url}{endpoint}"
     
     print(f"[*] Starting password spraying attack")
     print(f"[*] Target: {server_url}")

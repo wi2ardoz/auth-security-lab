@@ -137,12 +137,8 @@ class SimulatorRunner:
         :param config_path: Path to server configuration file
         """
         if config_path is None:
-            config_path = os.path.join(
-                os.path.dirname(__file__), const.REL_PATH_PARENT, 
-                const.REL_PATH_SERVER_DIR, const.REL_PATH_CONFIG_DIR, 
-                const.FILE_SERVER_CONFIG
-            )
-        
+            config_path = const.SERVER_CONFIG_PATH
+            
         self.config_path = config_path
         self.server_process = None
         self.original_config = None
@@ -150,13 +146,13 @@ class SimulatorRunner:
     def backup_config(self):
         """Backup the current server configuration."""
         self.original_config = load_config(self.config_path)
-        print(const.MSG_BACKED_UP_CONFIG)
+        print("[*] Backed up original configuration")
     
     def restore_config(self):
         """Restore the original server configuration."""
         if self.original_config:
             save_config(self.config_path, self.original_config)
-            print(const.MSG_RESTORED_CONFIG)
+            print("[*] Restored original configuration")
     
     def apply_scenario_config(self, scenario: Dict):
         """
@@ -173,7 +169,7 @@ class SimulatorRunner:
         current_config[const.CONFIG_KEY_DEFENSES] = scenario["config"][const.CONFIG_KEY_DEFENSES]
         
         save_config(self.config_path, current_config)
-        print(const.MSG_APPLIED_CONFIG.format(scenario['name']))
+        print(f"[*] Applied configuration: {scenario['name']}")
         print(f"    {scenario['description']}")
     
     def start_server(self):
@@ -185,7 +181,7 @@ class SimulatorRunner:
             const.REL_PATH_SERVER_DIR, const.FILE_SERVER_SCRIPT
         )
         
-        print(const.MSG_STARTING_SERVER)
+        print("[*] Starting server...")
         
         # Start server as subprocess
         self.server_process = subprocess.Popen(
@@ -201,28 +197,28 @@ class SimulatorRunner:
         # Check if server is still running
         if self.server_process.poll() is not None:
             stdout, stderr = self.server_process.communicate()
-            print(const.MSG_SERVER_FAILED)
-            print(const.MSG_SERVER_FAILED_STDOUT.format(stdout.decode()))
-            print(const.MSG_SERVER_FAILED_STDERR.format(stderr.decode()))
+            print("[!] Server failed to start!")
+            print(f"    stdout: {stdout.decode()}")
+            print(f"    stderr: {stderr.decode()}")
             return False
         
-        print(const.MSG_SERVER_STARTED.format(self.server_process.pid))
+        print(f"[+] Server started (PID: {self.server_process.pid})")
         return True
     
     def stop_server(self):
         """Stop the authentication server."""
         if self.server_process:
-            print(const.MSG_STOPPING_SERVER)
+            print("[*] Stopping server...")
             self.server_process.terminate()
             
             try:
                 self.server_process.wait(timeout=const.SERVER_SHUTDOWN_WAIT)
             except subprocess.TimeoutExpired:
-                print(const.MSG_SERVER_KILL)
+                print("[!] Server didn't stop gracefully, killing...")
                 self.server_process.kill()
                 self.server_process.wait()
             
-            print(const.MSG_SERVER_STOPPED)
+            print("[+] Server stopped")
             self.server_process = None
     
     def reset_database(self):
@@ -234,7 +230,7 @@ class SimulatorRunner:
             const.REL_PATH_SERVER_DIR, const.FILE_SETUP_DB_SCRIPT
         )
         
-        print(const.MSG_RESETTING_DB)
+        print("[*] Resetting database...")
         
         result = subprocess.run(
             [sys.executable, setup_script],
@@ -244,9 +240,9 @@ class SimulatorRunner:
         )
         
         if result.returncode == 0:
-            print(const.MSG_DB_RESET_SUCCESS)
+            print("[+] Database reset successfully")
         else:
-            print(const.MSG_DB_RESET_FAILED)
+            print("[!] Database reset failed!")
             print(f"    {result.stderr}")
     
     def get_usernames_from_data(self) -> List[str]:
@@ -272,7 +268,7 @@ class SimulatorRunner:
         :param server_url: Server URL
         :param usernames: List of usernames to target
         """
-        print(f"\n{const.ATTACK_HEADER_PASSWORD_SPRAY}")
+        print("\nRUNNING ATTACK: Password Spraying")
         
         password_spraying(server_url, usernames)
     
@@ -284,7 +280,7 @@ class SimulatorRunner:
         :param target_username: Username to target
         :param max_attempts: Maximum attempts to make
         """
-        print(f"\n{const.ATTACK_HEADER_BRUTE_FORCE.format(target_username)}")
+        print(f"\nRUNNING ATTACK: Brute Force (Target: {target_username})")
         
         brute_force_attack(server_url, target_username, max_attempts=max_attempts)
     
@@ -298,11 +294,11 @@ class SimulatorRunner:
         scenario = DefensePlaybook.get_scenario(scenario_name)
         
         if not scenario:
-            print(const.MSG_UNKNOWN_SCENARIO.format(scenario_name))
+            print(f"[!] Unknown scenario: {scenario_name}")
             return
         
-        print(f"\n{const.SCENARIO_HEADER_TEMPLATE.format(scenario['name'])}")
-        print(const.SCENARIO_DESC_TEMPLATE.format(scenario['description']))
+        print(f"\n# SCENARIO: {scenario['name']}")
+        print(f"# {scenario['description']}")
         
         # Apply configuration
         self.apply_scenario_config(scenario)
@@ -312,7 +308,7 @@ class SimulatorRunner:
         
         # Start server
         if not self.start_server():
-            print(const.MSG_FAILED_START_SKIP)
+            print("[!] Failed to start server, skipping attacks")
             return
         
         try:
@@ -352,8 +348,8 @@ class SimulatorRunner:
             const.SCENARIO_FULL_DEFENSES
         ]
         
-        print(f"\n{const.MSG_RUNNING_ALL_SCENARIOS}")
-        print(const.MSG_TOTAL_SCENARIOS.format(len(scenarios)))
+        print("\n* RUNNING ALL SCENARIOS")
+        print(f"* Total scenarios: {len(scenarios)}")
         
         for scenario_name in scenarios:
             self.run_scenario(scenario_name)
@@ -383,33 +379,23 @@ def main():
         help="Defense scenario to test"
     )
     
-    parser.add_argument(
-        "--no-backup",
-        action="store_true",
-        help="Don't backup/restore original configuration"
-    )
-    
     args = parser.parse_args()
     
     simulator = SimulatorRunner()
     
     try:
-        # Backup original config unless disabled
-        if not args.no_backup:
-            simulator.backup_config()
         
-        # Run selected scenario(s)
         if args.scenario == const.SCENARIO_ALL:
             simulator.run_all_scenarios()
         else:
             simulator.run_scenario(args.scenario)
-    
+
     finally:
         # Restore original config unless disabled
         if not args.no_backup:
             simulator.restore_config()
     
-    print(const.MSG_SIMULATION_COMPLETE)
+    print("\n[*] Simulation complete!")
 
 
 if __name__ == "__main__":
