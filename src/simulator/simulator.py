@@ -189,9 +189,9 @@ class SimulatorRunner:
         """
         print("\nRUNNING ATTACK: Password Spraying")
         
-        password_spraying(server_url, usernames)
+        password_spraying(server_url, usernames, e)
     
-    def run_brute_force_attack(self, server_url: str, target_username: str, max_attempts: int = None):
+    def run_brute_force_attack(self, server_url: str, target_username: str, endpoint):
         """
         Run brute force attack against a specific user.
         
@@ -201,9 +201,9 @@ class SimulatorRunner:
         """
         print(f"\nRUNNING ATTACK: Brute Force (Target: {target_username})")
         
-        brute_force_attack(server_url, target_username, max_attempts=max_attempts)
+        brute_force_attack(server_url, target_username, endpoint=endpoint)
     
-    def run_with_config(self, config: Dict):
+    def run_with_config(self, config: Dict, run_server):
         """
         Run attack with custom configuration.
         
@@ -216,12 +216,13 @@ class SimulatorRunner:
         print(f"# Defenses: {', '.join(enabled_defenses) or 'None'}")
         
         # Start server with config
-        if not self.start_server(config):
-            print("[!] Failed to start server, skipping attacks")
-            return
+        if run_server:
+            if not self.start_server(config):
+                print("[!] Failed to start server, skipping attacks")
+                return
         
-        # Reset database
-        self.reset_database()
+            # Reset database
+            self.reset_database()
         
         try:
             # Set server URL
@@ -244,7 +245,8 @@ class SimulatorRunner:
                     else const.TOTP_ENDPOINT
                 )
         finally:
-            self.stop_server()
+            if run_server:
+                self.stop_server()
     
     def run_all_scenarios(self):
         """
@@ -314,6 +316,11 @@ def parse_args():
         help="Run all pre-defined scenarios (ignores other flags)"
     )
     
+    parser.add_argument(
+        "--manual",
+        action="store_true",
+        help="Run attacks without server setup/teardown (for manual server control)"
+    )
     args = parser.parse_args()
     return args
 
@@ -343,7 +350,7 @@ def main():
             }
             
             # Run with custom config
-            simulator.run_with_config(config)
+            simulator.run_with_config(config, run_server=not args.manual)
     
     finally:
         pass
