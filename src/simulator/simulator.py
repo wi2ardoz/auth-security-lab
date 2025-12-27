@@ -5,125 +5,15 @@ Runs attack scenarios against configured server setups.
 """
 
 import json
-import os
 import random
 import sys
 import time
 import subprocess
-from typing import Dict, List, Optional
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+from typing import Dict, List
+import argparse
 import simulator_const as const
-from attacks import password_spraying, brute_force_attack, get_server_url_from_config, load_server_config
-from server.utils.config import load_config, save_config
-from server.utils import utils_const
-from server.defenses import defenses_const
+from attacks import password_spraying, brute_force_attack
 
-
-class DefensePlaybook:
-    """
-    Defines different defense configurations to test against attacks.
-    Each scenario represents a different security posture.
-    """
-    
-    @staticmethod
-    def get_scenario(scenario_name: str) -> Dict:
-        """
-        Get configuration for a specific defense scenario.
-        
-        :param scenario_name: Name of the scenario
-        :return: Configuration dictionary
-        """
-        scenarios = {
-            const.SCENARIO_NO_DEFENSES: {
-                "name": const.SCENARIO_NAME_NO_DEFENSES,
-                "description": const.SCENARIO_DESC_NO_DEFENSES,
-                "config": {
-                    const.CONFIG_KEY_HASH_MODE: None,
-                    const.CONFIG_KEY_DEFENSES: {
-                        const.CONFIG_KEY_RATE_LIMIT: False,
-                        const.CONFIG_KEY_LOCKOUT: False,
-                        const.CONFIG_KEY_CAPTCHA: False,
-                        const.CONFIG_KEY_TOTP: False,
-                        const.CONFIG_KEY_PEPPER: False
-                    }
-                }
-            },
-            const.SCENARIO_BASIC_HASHING: {
-                "name": const.SCENARIO_NAME_BASIC_HASHING,
-                "description": const.SCENARIO_DESC_BASIC_HASHING,
-                "config": {
-                    const.CONFIG_KEY_HASH_MODE: defenses_const.HASH_SHA256,
-                    const.CONFIG_KEY_DEFENSES: {
-                        const.CONFIG_KEY_RATE_LIMIT: False,
-                        const.CONFIG_KEY_LOCKOUT: False,
-                        const.CONFIG_KEY_CAPTCHA: False,
-                        const.CONFIG_KEY_TOTP: False,
-                        const.CONFIG_KEY_PEPPER: False
-                    }
-                }
-            },
-            const.SCENARIO_STRONG_HASHING: {
-                "name": const.SCENARIO_NAME_STRONG_HASHING,
-                "description": const.SCENARIO_DESC_STRONG_HASHING,
-                "config": {
-                    const.CONFIG_KEY_HASH_MODE: defenses_const.HASH_ARGON2ID,
-                    const.CONFIG_KEY_DEFENSES: {
-                        const.CONFIG_KEY_RATE_LIMIT: False,
-                        const.CONFIG_KEY_LOCKOUT: False,
-                        const.CONFIG_KEY_CAPTCHA: False,
-                        const.CONFIG_KEY_TOTP: False,
-                        const.CONFIG_KEY_PEPPER: False
-                    }
-                }
-            },
-            const.SCENARIO_RATE_LIMIT: {
-                "name": const.SCENARIO_NAME_RATE_LIMIT,
-                "description": const.SCENARIO_DESC_RATE_LIMIT,
-                "config": {
-                    const.CONFIG_KEY_HASH_MODE: defenses_const.HASH_SHA256,
-                    const.CONFIG_KEY_DEFENSES: {
-                        const.CONFIG_KEY_RATE_LIMIT: True,
-                        const.CONFIG_KEY_LOCKOUT: False,
-                        const.CONFIG_KEY_CAPTCHA: False,
-                        const.CONFIG_KEY_TOTP: False,
-                        const.CONFIG_KEY_PEPPER: False
-                    }
-                }
-            },
-            const.SCENARIO_LOCKOUT: {
-                "name": const.SCENARIO_NAME_LOCKOUT,
-                "description": const.SCENARIO_DESC_LOCKOUT,
-                "config": {
-                    const.CONFIG_KEY_HASH_MODE: defenses_const.HASH_SHA256,
-                    const.CONFIG_KEY_DEFENSES: {
-                        const.CONFIG_KEY_RATE_LIMIT: False,
-                        const.CONFIG_KEY_LOCKOUT: True,
-                        const.CONFIG_KEY_CAPTCHA: False,
-                        const.CONFIG_KEY_TOTP: False,
-                        const.CONFIG_KEY_PEPPER: False
-                    }
-                }
-            },
-            const.SCENARIO_FULL_DEFENSES: {
-                "name": const.SCENARIO_NAME_FULL_DEFENSES,
-                "description": const.SCENARIO_DESC_FULL_DEFENSES,
-                "config": {
-                    const.CONFIG_KEY_HASH_MODE: defenses_const.HASH_ARGON2ID,
-                    const.CONFIG_KEY_DEFENSES: {
-                        const.CONFIG_KEY_RATE_LIMIT: True,
-                        const.CONFIG_KEY_LOCKOUT: True,
-                        const.CONFIG_KEY_CAPTCHA: False,
-                        const.CONFIG_KEY_TOTP: False,
-                        const.CONFIG_KEY_PEPPER: True
-                    }
-                }
-            }
-        }
-        
-        return scenarios.get(scenario_name)
 
 
 class SimulatorRunner:
@@ -158,45 +48,46 @@ class SimulatorRunner:
             return json.load(f)
         
     
-    def backup_config(self):
-        """Backup the current server configuration."""
-        self.original_config = load_config(self.config_path)
-        print("[*] Backed up original configuration")
     
-    def restore_config(self):
-        """Restore the original server configuration."""
-        if self.original_config:
-            save_config(self.config_path, self.original_config)
-            print("[*] Restored original configuration")
-    
-    def apply_scenario_config(self, scenario: Dict):
+    def start_server(self, scenario_config: Dict = None):
         """
-        Apply a defense scenario configuration to the server.
+        Start the authentication server in a subprocess with flags based on scenario config.
         
-        :param scenario: Scenario dictionary with config
-        """
-        current_config = load_config(self.config_path)
-        
-        # Update with scenario config
-        if scenario["config"][const.CONFIG_KEY_HASH_MODE] is not None:
-            current_config[const.CONFIG_KEY_HASH_MODE] = scenario["config"][const.CONFIG_KEY_HASH_MODE]
-        
-        current_config[const.CONFIG_KEY_DEFENSES] = scenario["config"][const.CONFIG_KEY_DEFENSES]
-        
-        save_config(self.config_path, current_config)
-        print(f"[*] Applied configuration: {scenario['name']}")
-        print(f"    {scenario['description']}")
-    
-    def start_server(self):
-        """
-        Start the authentication server in a subprocess.
+        :param scenario_config: Scenario configuration dictionary with hash_mode and defenses
         """
         
         print("[*] Starting server...")
         
+        # Build command-line arguments
+        cmd = [sys.executable, const.SERVER_FILE]
+        
+        if scenario_config:
+            # Add hash mode
+            if const.CONFIG_KEY_HASH_MODE in scenario_config and scenario_config[const.CONFIG_KEY_HASH_MODE]:
+                cmd.extend(["--hash", scenario_config[const.CONFIG_KEY_HASH_MODE]])
+            
+            # Add defense flags
+            if const.CONFIG_KEY_DEFENSES in scenario_config:
+                defenses = scenario_config[const.CONFIG_KEY_DEFENSES]
+                
+                if defenses.get(const.CONFIG_KEY_RATE_LIMIT):
+                    cmd.append("--rate-limit")
+                
+                if defenses.get(const.CONFIG_KEY_LOCKOUT):
+                    cmd.append("--lockout")
+                
+                if defenses.get(const.CONFIG_KEY_CAPTCHA):
+                    cmd.append("--captcha")
+                
+                if defenses.get(const.CONFIG_KEY_TOTP):
+                    cmd.append("--totp")
+                
+                if defenses.get(const.CONFIG_KEY_PEPPER):
+                    cmd.append("--pepper")
+        
         # Start server as subprocess
         self.server_process = subprocess.Popen(
-            [sys.executable, const.SERVER_FILE],
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=const.SERVER_PATH
@@ -258,7 +149,7 @@ class SimulatorRunner:
         
         :return: List of usernames
         """
-        data = self.load_users_data()
+        data = self._load_users_data()
         return [user[const.JSON_KEY_USERNAME] for user in data[const.JSON_KEY_USERS]]
     
     def get_brute_force_targets_by_category(self) -> List[str]:
@@ -267,7 +158,6 @@ class SimulatorRunner:
         
         :return: List of usernames (one per category)
         """
-        
         
         # Group users by category
         categories = {}
@@ -310,117 +200,149 @@ class SimulatorRunner:
         
         brute_force_attack(server_url, target_username, max_attempts=max_attempts)
     
-    def run_scenario(self, scenario_name: str, run_attacks: bool = True):
+    def run_with_config(self, config: Dict):
         """
-        Run a complete test scenario with a specific defense configuration.
+        Run attack with custom configuration.
         
-        :param scenario_name: Name of the defense scenario
-        :param run_attacks: Whether to run attacks (True) or just setup (False)
+        :param config: Configuration dictionary with hash_mode and defenses
         """
-        scenario = DefensePlaybook.get_scenario(scenario_name)
+        # Display configuration
+        print("\n# RUNNING SCENARIO WITH CONFIGURATION")
+        print(f"# Hash: {config.get(const.CONFIG_KEY_HASH_MODE, 'None')}")
+        enabled_defenses = [k for k, v in config[const.CONFIG_KEY_DEFENSES].items() if v]
+        print(f"# Defenses: {', '.join(enabled_defenses) or 'None'}")
         
-        if not scenario:
-            print(f"[!] Unknown scenario: {scenario_name}")
-            return
-        
-        print(f"\n# SCENARIO: {scenario['name']}")
-        print(f"# {scenario['description']}")
-        
-        # Apply configuration
-        self.apply_scenario_config(scenario)
-        
-        # Reset database with new configuration
-        self.reset_database()
-        
-        # Start server
-        if not self.start_server():
+        # Start server with config
+        if not self.start_server(config):
             print("[!] Failed to start server, skipping attacks")
             return
         
-        try:
-            if run_attacks:
-                # Get server URL
-                config = load_server_config(self.config_path)
-                server_url = get_server_url_from_config(config)
-                
-                # Get all usernames
-                usernames = self.get_usernames_from_data()
-                
-                # Run password spraying attack
-                self.run_password_spraying_attack(server_url, usernames)
-                
-                # Run brute force attacks on select users (one from each category)
-                brute_force_targets = self.get_brute_force_targets_by_category()
-                for target_user in brute_force_targets:
-                    self.run_brute_force_attack(
-                        server_url, 
-                        target_user,
-                        max_attempts=const.DEFAULT_MAX_ATTEMPTS
-                    )
+        # Reset database
+        self.reset_database()
         
+        try:
+            # Set server URL
+            server_url = f"{const.SERVER_HOST}:{const.SERVER_PORT}"
+            
+            # Get all usernames
+            usernames = self.get_usernames_from_data()
+            
+            # Run attacks based on type
+            self.run_password_spraying_attack(server_url, usernames)
+            
+            # Run brute force on one user from each category
+            brute_force_targets = self.get_brute_force_targets_by_category()
+            for target_user in brute_force_targets:
+                self.run_brute_force_attack(
+                    server_url,
+                    target_user,
+                    endpoint=const.DEFAULT_ENDPOINT if config[const.CONFIG_KEY_DEFENSES].get(const.CONFIG_KEY_TOTP) == False
+                    else const.TOTP_ENDPOINT
+                )
         finally:
-            # Always stop the server
             self.stop_server()
     
     def run_all_scenarios(self):
         """
         Run all defense scenarios in sequence.
         """
-        scenarios = [
-            const.SCENARIO_NO_DEFENSES,
-            const.SCENARIO_BASIC_HASHING,
-            const.SCENARIO_STRONG_HASHING,
-            const.SCENARIO_RATE_LIMIT,
-            const.SCENARIO_LOCKOUT,
-            const.SCENARIO_FULL_DEFENSES
-        ]
+        scenarios = const.SCENARIOS
         
         print("\n* RUNNING ALL SCENARIOS")
         print(f"* Total scenarios: {len(scenarios)}")
         
-        for scenario_name in scenarios:
-            self.run_scenario(scenario_name)
+        for scenario in scenarios:
+            print(f"\n{'='*60}")
+            print(f"SCENARIO: {scenario['name']}")
+            print(f"{'='*60}")
+            self.run_with_config(scenario["config"], attack_type="both")
 
 
-def main():
-    """Main entry point for the simulator."""
-    import argparse
-    
+def parse_args():
     parser = argparse.ArgumentParser(
         description="Attack simulator for testing authentication server defenses"
     )
     
+    # Hash mode argument
     parser.add_argument(
-        "--scenario",
+        "--hash",
         type=str,
-        choices=[
-            const.SCENARIO_NO_DEFENSES,
-            const.SCENARIO_BASIC_HASHING,
-            const.SCENARIO_STRONG_HASHING,
-            const.SCENARIO_RATE_LIMIT,
-            const.SCENARIO_LOCKOUT,
-            const.SCENARIO_FULL_DEFENSES,
-            const.SCENARIO_ALL
-        ],
-        default=const.SCENARIO_ALL,
-        help="Defense scenario to test"
+        choices=[const.SHA256_HASHING, const.BCRYPT_HASHING, const.ARGON2ID_HASHING],
+        default=None,
+        help="Password hashing algorithm to use"
+    )
+    
+    # Defense mechanism flags
+    parser.add_argument(
+        "--rate-limit",
+        action="store_true",
+        help="Enable rate limiting"
+    )
+    
+    parser.add_argument(
+        "--lockout",
+        action="store_true",
+        help="Enable account lockout"
+    )
+    
+    parser.add_argument(
+        "--captcha",
+        action="store_true",
+        help="Enable CAPTCHA"
+    )
+    
+    parser.add_argument(
+        "--totp",
+        action="store_true",
+        help="Enable TOTP"
+    )
+    
+    parser.add_argument(
+        "--pepper",
+        action="store_true",
+        help="Enable pepper"
+    )
+    
+    # Run all scenarios flag
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Run all pre-defined scenarios (ignores other flags)"
     )
     
     args = parser.parse_args()
+    return args
+
+def main():
+    """Main entry point for the simulator."""
+
+    args = parse_args()
+
     
     simulator = SimulatorRunner()
     
     try:
-        
-        if args.scenario == const.SCENARIO_ALL:
+        if args.all_scenarios:
+            # Run all pre-defined scenarios
             simulator.run_all_scenarios()
         else:
-            simulator.run_scenario(args.scenario)
-
+            # Build config from arguments
+            config = {
+                const.CONFIG_KEY_HASH_MODE: args.hash,
+                const.CONFIG_KEY_DEFENSES: {
+                    const.CONFIG_KEY_RATE_LIMIT: args.rate_limit,
+                    const.CONFIG_KEY_LOCKOUT: args.lockout,
+                    const.CONFIG_KEY_CAPTCHA: args.captcha,
+                    const.CONFIG_KEY_TOTP: args.totp,
+                    const.CONFIG_KEY_PEPPER: args.pepper
+                }
+            }
+            
+            # Run with custom config
+            simulator.run_with_config(config, args.attack, args.target)
+    
     finally:
-        # Restore original config unless disabled
-        if not args.no_backup:
-            simulator.restore_config()
+        pass
     
     print("\n[*] Simulation complete!")
 

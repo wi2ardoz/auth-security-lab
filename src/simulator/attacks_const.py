@@ -2,11 +2,8 @@
 attacks_const.py
 Constants for attack simulation methods.
 """
-
-# Default values
-DEFAULT_LOCALHOST = "localhost"
-DEFAULT_SERVER_BIND_ADDRESS = "0.0.0.0"
-DEFAULT_TIMEOUT = 10  # seconds
+# Server Response codes
+SERVER_SUCCESS = 200
 
 # Password generation ranges
 PASSWORD_GEN_NUMBER_START = 0
@@ -22,8 +19,3 @@ PASSWORD_GEN_NUMBER_RANGE = 10
 # Password file paths
 PASSWORDS_FILE_PATH = "src/data/passwords.json"
 
-# Common passwords for quick testing
-COMMON_PASSWORDS = [
-    "password", "123456", "password123", "admin", "12345678",
-    "qwerty", "abc123", "letmein", "welcome", "monkey"
-]
