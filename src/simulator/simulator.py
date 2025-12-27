@@ -6,6 +6,7 @@ Runs attack scenarios against configured server setups.
 
 import json
 import os
+import random
 import sys
 import time
 import subprocess
@@ -142,6 +143,20 @@ class SimulatorRunner:
         self.config_path = config_path
         self.server_process = None
         self.original_config = None
+        self._users_data = self._load_users_data() 
+    
+    def _load_users_data(self) -> Dict:
+        """
+        Load users data from users.json file (cached).
+        
+        :return: Users data dictionary
+        """
+
+        users_file = const.FILE_USERS_DATA_PATH
+            
+        with open(users_file, 'r') as f:
+            return json.load(f)
+        
     
     def backup_config(self):
         """Backup the current server configuration."""
@@ -176,19 +191,15 @@ class SimulatorRunner:
         """
         Start the authentication server in a subprocess.
         """
-        server_script = os.path.join(
-            os.path.dirname(__file__), const.REL_PATH_PARENT, 
-            const.REL_PATH_SERVER_DIR, const.FILE_SERVER_SCRIPT
-        )
         
         print("[*] Starting server...")
         
         # Start server as subprocess
         self.server_process = subprocess.Popen(
-            [sys.executable, server_script],
+            [sys.executable, const.SERVER_FILE],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=os.path.dirname(server_script)
+            cwd=const.SERVER_PATH
         )
         
         # Wait for server to start
@@ -225,18 +236,14 @@ class SimulatorRunner:
         """
         Reset the database by running setup_db.py to repopulate with initial users.
         """
-        setup_script = os.path.join(
-            os.path.dirname(__file__), const.REL_PATH_PARENT, 
-            const.REL_PATH_SERVER_DIR, const.FILE_SETUP_DB_SCRIPT
-        )
         
         print("[*] Resetting database...")
         
         result = subprocess.run(
-            [sys.executable, setup_script],
+            [sys.executable, const.SETUP_DB_FILE],
             capture_output=True,
             text=True,
-            cwd=os.path.dirname(setup_script)
+            cwd=const.SETUP_DB_PATH
         )
         
         if result.returncode == 0:
@@ -251,15 +258,34 @@ class SimulatorRunner:
         
         :return: List of usernames
         """
-        users_file = os.path.join(
-            os.path.dirname(__file__), const.REL_PATH_PARENT, 
-            const.REL_PATH_DATA_DIR, const.FILE_USERS_DATA
-        )
-        
-        with open(users_file, 'r') as f:
-            data = json.load(f)
-        
+        data = self.load_users_data()
         return [user[const.JSON_KEY_USERNAME] for user in data[const.JSON_KEY_USERS]]
+    
+    def get_brute_force_targets_by_category(self) -> List[str]:
+        """
+        Get one username from each category in users.json for brute force testing.
+        
+        :return: List of usernames (one per category)
+        """
+        
+        
+        # Group users by category
+        categories = {}
+        for user in self._users_data[const.JSON_KEY_USERS]:
+            category = user.get('category', 'unknown')
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(user[const.JSON_KEY_USERNAME])
+        
+        # Select random username from each category
+        targets = []
+        for category in sorted(categories.keys()):
+            if categories[category]:
+                selected_user = random.choice(categories[category])
+                targets.append(selected_user)
+                print(f"[*] Selected '{selected_user}' from category '{category}'")
+        
+        return targets
     
     def run_password_spraying_attack(self, server_url: str, usernames: List[str]):
         """
@@ -323,8 +349,9 @@ class SimulatorRunner:
                 # Run password spraying attack
                 self.run_password_spraying_attack(server_url, usernames)
                 
-                # Run brute force attacks on select users
-                for target_user in const.DEFAULT_BRUTE_FORCE_TARGETS:
+                # Run brute force attacks on select users (one from each category)
+                brute_force_targets = self.get_brute_force_targets_by_category()
+                for target_user in brute_force_targets:
                     self.run_brute_force_attack(
                         server_url, 
                         target_user,

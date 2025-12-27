@@ -45,16 +45,15 @@ DEFAULT_BRUTE_FORCE_TARGETS = ["user01", "user02", "user03"]
 # Max attempts for testing
 DEFAULT_MAX_ATTEMPTS = 50
 
-# File paths (relative to simulator directory)
+# File paths
 SERVER_CONFIG_PATH = "src/server/server_config.json"
 SERVER_PATH = "src/server/server.py"
 SETUP_DB_PATH = "src/server/setup_db.py"
 FILE_USERS_DATA_PATH = "src/data/users.json"
+
 # File names
-FILE_SERVER_SCRIPT = "server.py"
-FILE_SETUP_DB_SCRIPT = "setup_db.py"
-FILE_USERS_DATA = "users.json"
-FILE_SERVER_CONFIG = "server_config.json"
+SERVER_FILE = "server.py"
+SETUP_DB_FILE = "setup_db.py"
 
 # Config keys
 CONFIG_KEY_HASH_MODE = "hash_mode"
