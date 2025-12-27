@@ -3,18 +3,11 @@ attacks.py
 Attack simulation methods for testing authentication server security.
 """
 
-import os
-import sys
 from typing import List
 import requests
 import json
-
+import time
 import attacks_const as const
-
-# Add parent directory to path for server imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-
 
 def load_passwords_from_file(file_path: str = None) -> List[str]:
     """
@@ -35,7 +28,6 @@ def load_passwords_from_file(file_path: str = None) -> List[str]:
 def password_spraying(
     server_url: str,
     usernames: List[str],
-    passwords: List[str] = None,
     endpoint: str = "/login",
 ):
     """
@@ -63,9 +55,8 @@ def password_spraying(
         for username in usernames:
             try:
                 response = requests.post(
-                    f"{server_url}/{endpoint}",
-                    json={"username": username, "password": password},
-                    timeout=const.DEFAULT_TIMEOUT
+                    f"{server_url}{endpoint}",
+                    json={"username": username, "password": password}
                 )
                 
                 if response.status_code == const.SERVER_SUCCESS:

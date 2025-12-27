@@ -13,6 +13,8 @@ from typing import Dict, List
 import argparse
 import simulator_const as const
 from attacks import password_spraying, brute_force_attack
+import os
+from pathlib import Path
 
 
 
@@ -29,12 +31,13 @@ class SimulatorRunner:
         """
         if config_path is None:
             config_path = const.SERVER_CONFIG_PATH
-            
+        
         self.config_path = config_path
         self.server_process = None
         self.original_config = None
         self._users_data = self._load_users_data() 
-    
+        self.root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # Parent dir of src
+
     def _load_users_data(self) -> Dict:
         """
         Load users data from users.json file (cached).
@@ -47,8 +50,6 @@ class SimulatorRunner:
         with open(users_file, 'r') as f:
             return json.load(f)
         
-    
-    
     def start_server(self, scenario_config: Dict = None):
         """
         Start the authentication server in a subprocess with flags based on scenario config.
@@ -59,7 +60,7 @@ class SimulatorRunner:
         print("[*] Starting server...")
         
         # Build command-line arguments
-        cmd = [sys.executable, const.SERVER_FILE]
+        cmd = [sys.executable, const.SERVER_PATH]
         
         if scenario_config:
             # Add hash mode
@@ -85,12 +86,14 @@ class SimulatorRunner:
                 if defenses.get(const.CONFIG_KEY_PEPPER):
                     cmd.append("--pepper")
         
+        # Set working directory to server folder
+        
         # Start server as subprocess
         self.server_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd=const.SERVER_PATH
+            cwd=self.root_dir
         )
         
         # Wait for server to start
@@ -129,12 +132,12 @@ class SimulatorRunner:
         """
         
         print("[*] Resetting database...")
-        
+
         result = subprocess.run(
-            [sys.executable, const.SETUP_DB_FILE],
+            [sys.executable, const.SETUP_DB_PATH],
             capture_output=True,
             text=True,
-            cwd=const.SETUP_DB_PATH
+            cwd=self.root_dir
         )
         
         if result.returncode == 0:
@@ -232,6 +235,7 @@ class SimulatorRunner:
             
             # Run brute force on one user from each category
             brute_force_targets = self.get_brute_force_targets_by_category()
+            print(brute_force_targets)
             for target_user in brute_force_targets:
                 self.run_brute_force_attack(
                     server_url,
@@ -322,7 +326,7 @@ def main():
     simulator = SimulatorRunner()
     
     try:
-        if args.all_scenarios:
+        if args.all:
             # Run all pre-defined scenarios
             simulator.run_all_scenarios()
         else:
@@ -339,7 +343,7 @@ def main():
             }
             
             # Run with custom config
-            simulator.run_with_config(config, args.attack, args.target)
+            simulator.run_with_config(config)
     
     finally:
         pass
