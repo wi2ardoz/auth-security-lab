@@ -75,7 +75,8 @@ def brute_force_attack(
     server_url: str,
     target_username: str,
     max_attempts: int = None,
-    endpoint: str = "/login"
+    endpoint: str = "/login",
+    password_list: List[str] = None
 ):
     """
     Simulate a brute force attack against a specific user.
@@ -90,7 +91,15 @@ def brute_force_attack(
     """
     if password_list is None:
         # Use common passwords plus some variations
-        password_list = load_passwords_from_file() + _generate_password_variations(target_username)
+        combined = load_passwords_from_file() + _generate_password_variations(target_username)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        password_list = []
+        for pwd in combined:
+            if pwd not in seen:
+                seen.add(pwd)
+                password_list.append(pwd)
     
     login_url = f"{server_url}/{endpoint}"
     
