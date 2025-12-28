@@ -91,8 +91,8 @@ class SimulatorRunner:
         # Start server as subprocess
         self.server_process = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             cwd=self.root_dir
         )
         
@@ -101,10 +101,8 @@ class SimulatorRunner:
         
         # Check if server is still running
         if self.server_process.poll() is not None:
-            stdout, stderr = self.server_process.communicate()
             print("[!] Server failed to start!")
-            print(f"    stdout: {stdout.decode()}")
-            print(f"    stderr: {stderr.decode()}")
+            print(f"    Exit code: {self.server_process.returncode}")
             return False
         
         print(f"[+] Server started (PID: {self.server_process.pid})")
@@ -261,7 +259,7 @@ class SimulatorRunner:
             print(f"\n{'='*60}")
             print(f"SCENARIO: {scenario['name']}")
             print(f"{'='*60}")
-            self.run_with_config(scenario["config"], attack_type="both")
+            self.run_with_config(scenario["config"], run_server=True)
 
 
 def parse_args():
@@ -274,8 +272,8 @@ def parse_args():
         "--hash",
         type=str,
         choices=[const.SHA256_HASHING, const.BCRYPT_HASHING, const.ARGON2ID_HASHING],
-        default=None,
-        help="Password hashing algorithm to use"
+        default=const.SHA256_HASHING,
+        help="Password hashing algorithm to use (default: sha256)"
     )
     
     # Defense mechanism flags
