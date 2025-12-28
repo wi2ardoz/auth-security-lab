@@ -189,7 +189,7 @@ class SimulatorRunner:
         """
         print("\nRUNNING ATTACK: Password Spraying")
         
-        password_spraying(server_url, usernames, e)
+        password_spraying(server_url, usernames)
     
     def run_brute_force_attack(self, server_url: str, target_username: str, endpoint):
         """

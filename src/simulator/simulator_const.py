@@ -83,19 +83,6 @@ JSON_KEY_USERNAME = "username"
 
 SCENARIOS =  [
         {
-            "name": SCENARIO_NAME_NO_DEFENSES,
-            "config": {
-                CONFIG_KEY_HASH_MODE: None,
-                CONFIG_KEY_DEFENSES: {
-                    CONFIG_KEY_RATE_LIMIT: False,
-                    CONFIG_KEY_LOCKOUT: False,
-                    CONFIG_KEY_CAPTCHA: False,
-                    CONFIG_KEY_TOTP: False,
-                    CONFIG_KEY_PEPPER: False
-                }
-            }
-        },
-        {
             "name": SCENARIO_NAME_SHA256_HASHING,
             "config": {
                 CONFIG_KEY_HASH_MODE: SHA256_HASHING,
