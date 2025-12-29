@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 import server_const as const
-from database import clear_users_table, init_database, insert_user
+from database import clear_auth_state_table, clear_users_table, init_database, insert_user
 from defenses import hash_password
 from utils import get_hash_settings, load_config
 
@@ -153,7 +153,8 @@ def main():
     print(f"\n⚠ Clearing existing database...")
     try:
         clear_users_table()
-        print("✓ Database cleared")
+        clear_auth_state_table()
+        print("✓ Database cleared (users + auth_state)")
     except Exception as e:
         print(f"✗ Error clearing database: {e}")
         sys.exit(1)

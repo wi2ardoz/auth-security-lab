@@ -11,13 +11,15 @@ import server_const as const
 
 def init_database():
     """
-    Initialize SQLite database and create users table if it doesn't exist.
+    Initialize SQLite database and create users and auth_state tables 
+    if they don't exist.
     """
     os.makedirs(os.path.dirname(const.DB_PATH), exist_ok=True)
 
     conn = sqlite3.connect(const.DB_PATH)
     cursor = conn.cursor()
 
+    # Create users table
     cursor.execute(
         """
             CREATE TABLE IF NOT EXISTS users (
@@ -25,6 +27,19 @@ def init_database():
                 password_hash TEXT NOT NULL,
                 salt TEXT,
                 totp_secret TEXT
+            )
+        """
+    )
+
+    # Create auth_state table
+    cursor.execute(
+        """
+            CREATE TABLE IF NOT EXISTS auth_state (
+                username TEXT PRIMARY KEY,
+                failed_attempts INTEGER DEFAULT 0,
+                locked_until TIMESTAMP NULL,
+                last_request_time TIMESTAMP NULL,
+                FOREIGN KEY (username) REFERENCES users(username)
             )
         """
     )
@@ -96,6 +111,20 @@ def clear_users_table():
         conn = sqlite3.connect(const.DB_PATH)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def clear_auth_state_table():
+    """
+    Remove all records from the auth_state table.
+    Critical for experiment isolation - ensures each experiment starts with clean state.
+    """
+    try:
+        conn = sqlite3.connect(const.DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM auth_state")
         conn.commit()
     finally:
         conn.close()
