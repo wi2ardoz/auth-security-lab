@@ -8,8 +8,10 @@ import time
 
 import server_const as const
 import uvicorn
-from database import get_user, init_database, insert_user
-from defenses import check_rate_limit, hash_password, verify_password
+from database import get_db_cursor, get_user, init_database, insert_user
+from defenses import (check_rate_limit, hash_password,
+                      increment_failed_attempts, is_account_locked,
+                      reset_failed_attempts, verify_password)
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from utils import (get_hash_settings, get_next_log_filename, init_from_cli,
@@ -72,9 +74,9 @@ async def register_user(request: RegisterRequest):
 async def login_user(request: LoginRequest):
     try:
         start_time = time.time()
+        defenses = app.state.config.get(utils_const.SCHEME_KEY_DEFENSES, {})
 
         # Defense 1 - Rate Limiting
-        defenses = app.state.config.get(utils_const.SCHEME_KEY_DEFENSES, {})
         if defenses.get(utils_const.SCHEME_KEY_DEFENSE_RATE_LIMIT, False):
             allowed, retry_after = check_rate_limit(request.username)
             if not allowed:
@@ -91,44 +93,72 @@ async def login_user(request: LoginRequest):
                     "retry_after": retry_after,
                 }
 
-        user = get_user(request.username)
-        if user is None:
-            _log_attempt(
-                request.username,
-                start_time,
-                const.LOG_RESULT_FAILURE,
-                failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+        # Use database cursor for lockout checks and user verification
+        with get_db_cursor() as cursor:
+            # Defense 2 - Account Lockout
+            if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False):
+                locked, remaining = is_account_locked(cursor, request.username)
+                if locked:
+                    _log_attempt(
+                        request.username,
+                        start_time,
+                        const.LOG_RESULT_FAILURE,
+                        failure_reason=const.FAILURE_REASON_ACCOUNT_LOCKED,
+                    )
+                    return {
+                        "status": const.SERVER_FAILURE,
+                        "message": const.SERVER_MSG_ACCOUNT_LOCKED,
+                        "locked_until_seconds": remaining,
+                    }
+
+            # Verify user exists
+            # WARNING - NOT FOR PRODUCTION USE
+            # Attacker can do username enumeration attacks based on timing and messages
+            user = get_user(request.username)
+            if user is None:
+                _log_attempt(
+                    request.username,
+                    start_time,
+                    const.LOG_RESULT_FAILURE,
+                    failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+                )
+                return {
+                    "status": const.SERVER_FAILURE,
+                    "message": const.SERVER_MSG_LOGIN_INVALID,
+                }
+            username, password_hash, salt, totp_secret = user
+
+            # Verify password
+            hash_mode, pepper = get_hash_settings(app.state.config)
+            verified = verify_password(
+                request.password, password_hash, hash_mode, salt=salt, pepper=pepper
             )
-            return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_LOGIN_INVALID,
-            }
-        username, password_hash, salt, totp_secret = user
 
-        # Retrieve hash settings from config
-        hash_mode, pepper = get_hash_settings(app.state.config)
+            if verified:
+                # Success - reset lockout counter
+                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False):
+                    reset_failed_attempts(cursor, request.username)
 
-        verified = verify_password(
-            request.password, password_hash, hash_mode, salt=salt, pepper=pepper
-        )
+                _log_attempt(request.username, start_time, const.LOG_RESULT_SUCCESS)
+                return {
+                    "status": const.SERVER_SUCCESS,
+                    "message": const.SERVER_MSG_LOGIN_OK,
+                }
+            else:
+                # Failure - increment lockout counter
+                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False):
+                    increment_failed_attempts(cursor, request.username)
 
-        if verified:
-            _log_attempt(request.username, start_time, const.LOG_RESULT_SUCCESS)
-            return {
-                "status": const.SERVER_SUCCESS,
-                "message": const.SERVER_MSG_LOGIN_OK,
-            }
-        else:
-            _log_attempt(
-                request.username,
-                start_time,
-                const.LOG_RESULT_FAILURE,
-                failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
-            )
-            return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_LOGIN_INVALID,
-            }
+                _log_attempt(
+                    request.username,
+                    start_time,
+                    const.LOG_RESULT_FAILURE,
+                    failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+                )
+                return {
+                    "status": const.SERVER_FAILURE,
+                    "message": const.SERVER_MSG_LOGIN_INVALID,
+                }
 
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

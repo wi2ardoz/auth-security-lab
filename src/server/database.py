@@ -5,6 +5,7 @@ SQLite database management for user authentication.
 
 import os
 import sqlite3
+from contextlib import contextmanager
 
 import server_const as const
 
@@ -125,6 +126,29 @@ def clear_auth_state_table():
         conn = sqlite3.connect(const.DB_PATH)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM auth_state")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@contextmanager
+def get_db_cursor():
+    """
+    Context manager for database cursor.
+    Automatically handles connection, commit, and cleanup.
+
+    Usage:
+        with get_db_cursor() as cursor:
+            cursor.execute("SELECT ...")
+            result = cursor.fetchone()
+
+    Yields:
+        Database cursor with auto-commit on success, auto-close on exit
+    """
+    conn = sqlite3.connect(const.DB_PATH)
+    cursor = conn.cursor()
+    try:
+        yield cursor
         conn.commit()
     finally:
         conn.close()
