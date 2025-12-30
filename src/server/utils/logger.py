@@ -60,7 +60,8 @@ def init_log_file(log_filepath):
             pass  # Create empty file
 
 
-def log_attempt(log_filepath, username, result, latency_ms, config):
+def log_attempt(log_filepath, username, result, latency_ms, config, 
+    failure_reason=None, retry_after=None):
     """
     Log a single authentication attempt as JSON line.
 
@@ -69,6 +70,8 @@ def log_attempt(log_filepath, username, result, latency_ms, config):
     :param result: "success" or "failure"
     :param latency_ms: Request latency in milliseconds
     :param config: Server configuration dictionary
+    :param failure_reason: Optional reason for failure (rate_limited, invalid_credentials, etc.)
+    :param retry_after: Optional seconds until retry allowed (for rate limiting)
     """
     timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
@@ -81,6 +84,12 @@ def log_attempt(log_filepath, username, result, latency_ms, config):
         "latency_ms": round(latency_ms, 2),
         "group_seed": config[utils_const.SCHEME_KEY_GROUP_SEED],
     }
+
+    # Add optional fields if provided
+    if failure_reason is not None:
+        log_entry["failure_reason"] = failure_reason
+    if retry_after is not None:
+        log_entry["retry_after"] = round(retry_after, 2)
 
     # Append as single JSON line
     with open(log_filepath, "a") as f:

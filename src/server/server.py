@@ -9,7 +9,7 @@ import time
 import server_const as const
 import uvicorn
 from database import get_user, init_database, insert_user
-from defenses import hash_password, verify_password
+from defenses import check_rate_limit, hash_password, verify_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from utils import (get_hash_settings, get_next_log_filename, init_from_cli,
@@ -73,9 +73,32 @@ async def login_user(request: LoginRequest):
     try:
         start_time = time.time()
 
+        # Defense 1 - Rate Limiting
+        defenses = app.state.config.get(utils_const.SCHEME_KEY_DEFENSES, {})
+        if defenses.get(utils_const.SCHEME_KEY_DEFENSE_RATE_LIMIT, False):
+            allowed, retry_after = check_rate_limit(request.username)
+            if not allowed:
+                _log_attempt(
+                    request.username,
+                    start_time,
+                    const.LOG_RESULT_FAILURE,
+                    failure_reason=const.FAILURE_REASON_RATE_LIMITED,
+                    retry_after=retry_after,
+                )
+                return {
+                    "status": const.SERVER_FAILURE,
+                    "message": const.SERVER_MSG_RATE_LIMITED,
+                    "retry_after": retry_after,
+                }
+
         user = get_user(request.username)
         if user is None:
-            _log_attempt(request.username, start_time, const.LOG_RESULT_FAILURE)
+            _log_attempt(
+                request.username,
+                start_time,
+                const.LOG_RESULT_FAILURE,
+                failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+            )
             return {
                 "status": const.SERVER_FAILURE,
                 "message": const.SERVER_MSG_LOGIN_INVALID,
@@ -96,7 +119,12 @@ async def login_user(request: LoginRequest):
                 "message": const.SERVER_MSG_LOGIN_OK,
             }
         else:
-            _log_attempt(request.username, start_time, const.LOG_RESULT_FAILURE)
+            _log_attempt(
+                request.username,
+                start_time,
+                const.LOG_RESULT_FAILURE,
+                failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+            )
             return {
                 "status": const.SERVER_FAILURE,
                 "message": const.SERVER_MSG_LOGIN_INVALID,
@@ -117,16 +145,26 @@ async def login_totp_user(request: LoginTOTPRequest):
     }
 
 
-def _log_attempt(username, start_time, result):
+def _log_attempt(username, start_time, result, failure_reason=None, retry_after=None):
     """
     Helper function to log authentication attempt with automatic latency calculation.
 
     :param username: Username attempted
     :param start_time: Request start time from time.time()
     :param result: const.LOG_RESULT_SUCCESS or const.LOG_RESULT_FAILURE
+    :param failure_reason: Optional reason for failure (rate_limited, invalid_credentials, etc.)
+    :param retry_after: Optional seconds until retry allowed (for rate limiting)
     """
     latency_ms = (time.time() - start_time) * 1000
-    log_attempt(app.state.log_filepath, username, result, latency_ms, app.state.config)
+    log_attempt(
+        app.state.log_filepath,
+        username,
+        result,
+        latency_ms,
+        app.state.config,
+        failure_reason=failure_reason,
+        retry_after=retry_after,
+    )
 
 
 if __name__ == "__main__":
