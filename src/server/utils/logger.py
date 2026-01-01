@@ -76,12 +76,23 @@ def log_attempt(log_filepath, username, result, latency_ms, config,
     timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
     log_entry = {
+        # ID & Time
         "timestamp": timestamp,
         "username": username,
+        
+        # Security
         "hash_mode": config[utils_const.SCHEME_KEY_HASH_MODE],
         "protection_flags": config[utils_const.SCHEME_KEY_DEFENSES].copy(),
+        
+        # Outcome
         "result": result,
+        "failure_reason": None,
+        "retry_after": None,
+        
+        # Performance
         "latency_ms": round(latency_ms, 2),
+        
+        # Metadata
         "group_seed": config[utils_const.SCHEME_KEY_GROUP_SEED],
     }
 
