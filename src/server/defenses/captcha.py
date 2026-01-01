@@ -1,5 +1,5 @@
 """
-captcha_manager.py
+captcha.py
 CAPTCHA token generation and validation for failed login attempts.
 """
 
