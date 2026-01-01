@@ -1,19 +1,21 @@
 """
 server.py
 FastAPI server for user registration and login with SQLite database.
+
+Refactored to use AuthService for authentication logic separation.
 """
 
 import sqlite3
-import time
 
 import server_const as const
 import uvicorn
-from database import get_user, init_database, insert_user
-from defenses import hash_password, verify_password
+from auth_service import AuthService
+from database import init_database, insert_user
+from defenses import hash_password
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from utils import (get_hash_settings, get_next_log_filename, init_from_cli,
-                   init_log_file, log_attempt, parse_cli_args, utils_const)
+                   init_log_file, parse_cli_args, utils_const)
 
 
 # Request models
@@ -25,20 +27,32 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+    captcha_token: str | None = None  # Optional CAPTCHA token
 
 
 class LoginTOTPRequest(BaseModel):
     username: str
-    password: str
     totp_code: str
 
 
 # FastAPI app
 app = FastAPI()
 
+# Authentication service (initialized in main)
+auth_service: AuthService = None
+
 
 @app.post("/register")
 async def register_user(request: RegisterRequest):
+    """
+    Register a new user with username and password.
+
+    Args:
+        request: RegisterRequest with username and password
+
+    Returns:
+        Response with status and message
+    """
     try:
         # Retrieve hash settings from config
         hash_mode, pepper = get_hash_settings(app.state.config)
@@ -70,38 +84,28 @@ async def register_user(request: RegisterRequest):
 
 @app.post("/login")
 async def login_user(request: LoginRequest):
+    """
+    Authenticate user with username and password.
+
+    Orchestrates all defense mechanisms through AuthService:
+    1. Account Lockout
+    2. Rate Limiting
+    3. CAPTCHA
+    4. Password Verification
+    5. TOTP Check
+
+    Args:
+        request: LoginRequest with username, password, and optional captcha_token
+
+    Returns:
+        Response with status and message
+    """
     try:
-        start_time = time.time()
-
-        user = get_user(request.username)
-        if user is None:
-            _log_attempt(request.username, start_time, const.LOG_RESULT_FAILURE)
-            return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_LOGIN_INVALID,
-            }
-        username, password_hash, salt, totp_secret = user
-
-        # Retrieve hash settings from config
-        hash_mode, pepper = get_hash_settings(app.state.config)
-
-        verified = verify_password(
-            request.password, password_hash, hash_mode, salt=salt, pepper=pepper
+        return auth_service.authenticate(
+            request.username,
+            request.password,
+            request.captcha_token
         )
-
-        if verified:
-            _log_attempt(request.username, start_time, const.LOG_RESULT_SUCCESS)
-            return {
-                "status": const.SERVER_SUCCESS,
-                "message": const.SERVER_MSG_LOGIN_OK,
-            }
-        else:
-            _log_attempt(request.username, start_time, const.LOG_RESULT_FAILURE)
-            return {
-                "status": const.SERVER_FAILURE,
-                "message": const.SERVER_MSG_LOGIN_INVALID,
-            }
-
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except ValueError as e:
@@ -110,23 +114,27 @@ async def login_user(request: LoginRequest):
 
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
-    # TODO: Implement later
-    return {
-        "status": const.SERVER_FAILURE,
-        "message": "TOTP not implemented yet",
-    }
-
-
-def _log_attempt(username, start_time, result):
     """
-    Helper function to log authentication attempt with automatic latency calculation.
+    Authenticate user with TOTP code (second factor).
 
-    :param username: Username attempted
-    :param start_time: Request start time from time.time()
-    :param result: const.LOG_RESULT_SUCCESS or const.LOG_RESULT_FAILURE
+    This endpoint is used after successful password authentication when
+    TOTP is enabled for the user.
+
+    Args:
+        request: LoginTOTPRequest with username and totp_code
+
+    Returns:
+        Response with status and message
     """
-    latency_ms = (time.time() - start_time) * 1000
-    log_attempt(app.state.log_filepath, username, result, latency_ms, app.state.config)
+    try:
+        return auth_service.authenticate_totp(
+            request.username,
+            request.totp_code
+        )
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
 if __name__ == "__main__":
@@ -145,6 +153,9 @@ if __name__ == "__main__":
     init_log_file(log_filepath)
     app.state.log_filepath = log_filepath
     print(f"✓ Logging to: {log_filepath}")
+
+    # Initialize authentication service
+    auth_service = AuthService(app.state.config, log_filepath)
 
     # Start server
     host = app.state.config[utils_const.SCHEME_KEY_HOST]

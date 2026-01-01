@@ -255,11 +255,15 @@ Unique identifier for each team, calculated as: `SEED_GROUP = ID1 XOR ID2` (bitw
 |------|------|-------------|
 | 1 | Literature review, tool selection, Server setup, User dataset creation | Server App + Basic logs | 
 | 2 | Simulator, Brute-Force & Password-Spraying testing | Client App + Attack logs + Interim report |
-| 3 | Add protection mechanisms (Rate-Limit, Pepper, TOTP, CAPTCHA), repeat tests | Complete logs + Analysis data |
+| 3 | Add protection mechanisms (Rate-Limit, account lockout, TOTP, CAPTCHA), repeat tests | Complete logs + Analysis data |
 | 4-5 | Data analysis, report writing, presentation, and demo video | Final submission (Report, Presentation, Video) |
 
 ## Version History
 
+- **v3.0**
+  - Add protection mechanisms: Rate-Limit, account lockout, TOTP, CAPTCHA
+  - Add `auth_state` table for database
+  - Refactor authentication service in `server.py`
 - **v2.0**
   - Added FastAPI-based auth server with CLI configuration and SQLite DB
   - Database seeder: src/server/setup_db.py (imports 30 test accounts from src/data/users.json)
