@@ -78,9 +78,14 @@ class AuthService:
             if not verified:
                 return error_response
 
+            # Password correct - reset failed attempts counter
+            # This happens before TOTP check because password verification succeeded
+            if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False) or \
+               defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
+                reset_failed_attempts(cursor, username)
+
             # Defense 4: TOTP (Two-Factor Authentication)
             if defenses.get(utils_const.SCHEME_KEY_DEFENSE_TOTP, False) and totp_secret:
-                # User has TOTP enabled - require second factor
                 self._log_attempt(
                     username,
                     start_time,
@@ -93,11 +98,7 @@ class AuthService:
                     "totp_required": True,
                 }
 
-            # Success - reset failed attempts counter
-            if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False) or \
-               defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
-                reset_failed_attempts(cursor, username)
-
+            # Complete success (no TOTP required)
             self._log_attempt(username, start_time, const.LOG_RESULT_SUCCESS)
             return {
                 "status": const.SERVER_SUCCESS,
