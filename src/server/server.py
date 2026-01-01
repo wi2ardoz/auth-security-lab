@@ -12,7 +12,8 @@ from database import get_db_cursor, get_user, init_database, insert_user
 from defenses import (check_rate_limit, generate_captcha_token, hash_password,
                       increment_failed_attempts, is_account_locked,
                       reset_failed_attempts, should_require_captcha,
-                      validate_captcha_token, verify_password)
+                      validate_captcha_token, validate_totp_code,
+                      verify_password)
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from utils import (get_hash_settings, get_next_log_filename, init_from_cli,
@@ -33,7 +34,6 @@ class LoginRequest(BaseModel):
 
 class LoginTOTPRequest(BaseModel):
     username: str
-    password: str
     totp_code: str
 
 
@@ -170,6 +170,21 @@ async def login_user(request: LoginRequest):
             )
 
             if verified:
+                # Defense 4 - TOTP (Two-Factor Authentication)
+                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_TOTP, False) and totp_secret:
+                    # User has TOTP enabled - require second factor
+                    _log_attempt(
+                        request.username,
+                        start_time,
+                        const.LOG_RESULT_FAILURE,
+                        failure_reason=const.FAILURE_REASON_TOTP_REQUIRED,
+                    )
+                    return {
+                        "status": const.SERVER_FAILURE,
+                        "message": const.SERVER_MSG_TOTP_REQUIRED,
+                        "totp_required": True,
+                    }
+
                 # Success - reset failed attempts counter (for lockout/CAPTCHA)
                 if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False) or \
                    defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
@@ -205,11 +220,68 @@ async def login_user(request: LoginRequest):
 
 @app.post("/login_totp")
 async def login_totp_user(request: LoginTOTPRequest):
-    # TODO: Implement later
-    return {
-        "status": const.SERVER_FAILURE,
-        "message": "TOTP not implemented yet",
-    }
+    try:
+        start_time = time.time()
+
+        # Verify user exists and has TOTP secret
+        user = get_user(request.username)
+        if user is None:
+            _log_attempt(
+                request.username,
+                start_time,
+                const.LOG_RESULT_FAILURE,
+                failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+            )
+            return {
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_LOGIN_INVALID,
+            }
+        _, _, _, totp_secret = user
+
+        # Verify TOTP secret exists
+        if not totp_secret:
+            _log_attempt(
+                request.username,
+                start_time,
+                const.LOG_RESULT_FAILURE,
+                failure_reason=const.FAILURE_REASON_TOTP_INVALID,
+            )
+            return {
+                "status": const.SERVER_FAILURE,
+                "message": const.SERVER_MSG_TOTP_INVALID,
+            }
+
+        # Validate TOTP code
+        with get_db_cursor() as cursor:
+            totp_valid = validate_totp_code(totp_secret, request.totp_code)
+            if totp_valid:
+                # TOTP correct - reset failed attempts counter (for lockout/CAPTCHA)
+                defenses = app.state.config.get(utils_const.SCHEME_KEY_DEFENSES, {})
+                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False) or \
+                   defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
+                    reset_failed_attempts(cursor, request.username)
+
+                _log_attempt(request.username, start_time, const.LOG_RESULT_SUCCESS)
+                return {
+                    "status": const.SERVER_SUCCESS,
+                    "message": const.SERVER_MSG_LOGIN_OK,
+                }
+            else:
+                _log_attempt(
+                    request.username,
+                    start_time,
+                    const.LOG_RESULT_FAILURE,
+                    failure_reason=const.FAILURE_REASON_TOTP_INVALID,
+                )
+                return {
+                    "status": const.SERVER_FAILURE,
+                    "message": const.SERVER_MSG_TOTP_INVALID,
+                }
+
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Configuration error: {str(e)}")
 
 
 def _log_attempt(username, start_time, result, failure_reason=None, retry_after=None):
