@@ -78,26 +78,9 @@ async def login_user(request: LoginRequest):
         start_time = time.time()
         defenses = app.state.config.get(utils_const.SCHEME_KEY_DEFENSES, {})
 
-        # Defense 1 - Rate Limiting
-        if defenses.get(utils_const.SCHEME_KEY_DEFENSE_RATE_LIMIT, False):
-            allowed, retry_after = check_rate_limit(request.username)
-            if not allowed:
-                _log_attempt(
-                    request.username,
-                    start_time,
-                    const.LOG_RESULT_FAILURE,
-                    failure_reason=const.FAILURE_REASON_RATE_LIMITED,
-                    retry_after=retry_after,
-                )
-                return {
-                    "status": const.SERVER_FAILURE,
-                    "message": const.SERVER_MSG_RATE_LIMITED,
-                    "retry_after": retry_after,
-                }
-
-        # Use database cursor for lockout checks and user verification
+        # Use database cursor for all defense checks and user verification
         with get_db_cursor() as cursor:
-            # Defense 2 - Account Lockout
+            # Defense 1 - Account Lockout (most restrictive, long-term)
             if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False):
                 locked, remaining = is_account_locked(cursor, request.username)
                 if locked:
@@ -111,6 +94,23 @@ async def login_user(request: LoginRequest):
                         "status": const.SERVER_FAILURE,
                         "message": const.SERVER_MSG_ACCOUNT_LOCKED,
                         "locked_until_seconds": remaining,
+                    }
+
+            # Defense 2 - Rate Limiting (short-term flooding protection)
+            if defenses.get(utils_const.SCHEME_KEY_DEFENSE_RATE_LIMIT, False):
+                allowed, retry_after = check_rate_limit(request.username)
+                if not allowed:
+                    _log_attempt(
+                        request.username,
+                        start_time,
+                        const.LOG_RESULT_FAILURE,
+                        failure_reason=const.FAILURE_REASON_RATE_LIMITED,
+                        retry_after=retry_after,
+                    )
+                    return {
+                        "status": const.SERVER_FAILURE,
+                        "message": const.SERVER_MSG_RATE_LIMITED,
+                        "retry_after": retry_after,
                     }
 
             # Defense 3 - CAPTCHA
