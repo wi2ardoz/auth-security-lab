@@ -9,9 +9,10 @@ import time
 import server_const as const
 import uvicorn
 from database import get_db_cursor, get_user, init_database, insert_user
-from defenses import (check_rate_limit, hash_password,
+from defenses import (check_rate_limit, generate_captcha_token, hash_password,
                       increment_failed_attempts, is_account_locked,
-                      reset_failed_attempts, verify_password)
+                      reset_failed_attempts, should_require_captcha,
+                      validate_captcha_token, verify_password)
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from utils import (get_hash_settings, get_next_log_filename, init_from_cli,
@@ -27,6 +28,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+    captcha_token: str | None = None  # Optional CAPTCHA token
 
 
 class LoginTOTPRequest(BaseModel):
@@ -111,6 +113,39 @@ async def login_user(request: LoginRequest):
                         "locked_until_seconds": remaining,
                     }
 
+            # Defense 3 - CAPTCHA
+            if defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
+                requires_captcha = should_require_captcha(cursor, request.username)
+                if requires_captcha:
+                    if not request.captcha_token:
+                        # CAPTCHA required but not provided - generate and return token
+                        captcha_token = generate_captcha_token(request.username)
+                        _log_attempt(
+                            request.username,
+                            start_time,
+                            const.LOG_RESULT_FAILURE,
+                            failure_reason=const.FAILURE_REASON_CAPTCHA_REQUIRED,
+                        )
+                        return {
+                            "status": const.SERVER_FAILURE,
+                            "message": const.SERVER_MSG_CAPTCHA_REQUIRED,
+                            "captcha_required": True,
+                            "captcha_token": captcha_token,
+                        }
+                    else:
+                        # CAPTCHA provided - validate it
+                        if not validate_captcha_token(request.username, request.captcha_token):
+                            _log_attempt(
+                                request.username,
+                                start_time,
+                                const.LOG_RESULT_FAILURE,
+                                failure_reason=const.FAILURE_REASON_CAPTCHA_INVALID,
+                            )
+                            return {
+                                "status": const.SERVER_FAILURE,
+                                "message": const.SERVER_MSG_CAPTCHA_INVALID,
+                            }
+
             # Verify user exists
             # WARNING - NOT FOR PRODUCTION USE
             # Attacker can do username enumeration attacks based on timing and messages
@@ -135,8 +170,9 @@ async def login_user(request: LoginRequest):
             )
 
             if verified:
-                # Success - reset lockout counter
-                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False):
+                # Success - reset failed attempts counter (for lockout/CAPTCHA)
+                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False) or \
+                   defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
                     reset_failed_attempts(cursor, request.username)
 
                 _log_attempt(request.username, start_time, const.LOG_RESULT_SUCCESS)
@@ -145,8 +181,9 @@ async def login_user(request: LoginRequest):
                     "message": const.SERVER_MSG_LOGIN_OK,
                 }
             else:
-                # Failure - increment lockout counter
-                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False):
+                # Failure - increment failed attempts counter (for lockout/CAPTCHA)
+                if defenses.get(utils_const.SCHEME_KEY_DEFENSE_LOCKOUT, False) or \
+                   defenses.get(utils_const.SCHEME_KEY_DEFENSE_CAPTCHA, False):
                     increment_failed_attempts(cursor, request.username)
 
                 _log_attempt(
