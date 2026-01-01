@@ -6,6 +6,8 @@ Account lockout after consecutive failed login attempts.
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
+from database import get_auth_state, insert_auth_state, reset_auth_state, update_auth_state
+
 from . import defenses_const
 
 
@@ -22,18 +24,12 @@ def is_account_locked(cursor, username: str) -> Tuple[bool, Optional[int]]:
             - locked: True if account is locked, False otherwise
             - remaining_seconds: Seconds until unlock (None if not locked)
     """
-    cursor.execute(
-        """
-        SELECT locked_until FROM auth_state WHERE username = ?
-        """,
-        (username,),
-    )
-    result = cursor.fetchone()
+    auth_state = get_auth_state(cursor, username)
 
-    if not result or not result[0]:
+    if not auth_state or not auth_state[1]:
         return False, None
 
-    locked_until = datetime.fromisoformat(result[0])
+    locked_until = datetime.fromisoformat(auth_state[1])
     now = datetime.now(timezone.utc)
 
     if now < locked_until:
@@ -63,18 +59,11 @@ def increment_failed_attempts(
     Returns:
         True if account was just locked, False otherwise
     """
-    # Get current failed attempts
-    cursor.execute(
-        """
-        SELECT failed_attempts FROM auth_state WHERE username = ?
-        """,
-        (username,),
-    )
-    result = cursor.fetchone()
+    auth_state = get_auth_state(cursor, username)
 
-    if result:
+    if auth_state:
         # User exists in auth_state
-        current_attempts = result[0]
+        current_attempts = auth_state[0]
         new_attempts = current_attempts + 1
 
         if new_attempts >= lockout_threshold:
@@ -82,35 +71,15 @@ def increment_failed_attempts(
             locked_until = datetime.now(timezone.utc) + timedelta(
                 seconds=lockout_duration
             )
-            cursor.execute(
-                """
-                UPDATE auth_state
-                SET failed_attempts = ?, locked_until = ?
-                WHERE username = ?
-                """,
-                (new_attempts, locked_until.isoformat(), username),
-            )
+            update_auth_state(cursor, username, new_attempts, locked_until.isoformat())
             return True
         else:
             # Increment counter
-            cursor.execute(
-                """
-                UPDATE auth_state
-                SET failed_attempts = ?
-                WHERE username = ?
-                """,
-                (new_attempts, username),
-            )
+            update_auth_state(cursor, username, new_attempts, locked_until=None)
             return False
     else:
         # First failed attempt - insert new record
-        cursor.execute(
-            """
-            INSERT INTO auth_state (username, failed_attempts)
-            VALUES (?, 1)
-            """,
-            (username,),
-        )
+        insert_auth_state(cursor, username, failed_attempts=1)
         return False
 
 
@@ -123,20 +92,4 @@ def reset_failed_attempts(cursor, username: str):
         cursor: Database cursor
         username: Username to reset
     """
-    cursor.execute(
-        """
-        UPDATE auth_state
-        SET failed_attempts = 0, locked_until = NULL
-        WHERE username = ?
-        """,
-        (username,),
-    )
-    # Insert if not exists
-    if cursor.rowcount == 0:
-        cursor.execute(
-            """
-            INSERT INTO auth_state (username, failed_attempts, locked_until)
-            VALUES (?, 0, NULL)
-            """,
-            (username,),
-        )
+    reset_auth_state(cursor, username)

@@ -152,3 +152,86 @@ def get_db_cursor():
         conn.commit()
     finally:
         conn.close()
+
+
+# Auth State Repository Functions
+def get_auth_state(cursor, username):
+    """
+    Get authentication state for a user.
+
+    Args:
+        cursor: Database cursor
+        username: Username to query
+
+    Returns:
+        Tuple (failed_attempts, locked_until) or None if not found
+    """
+    cursor.execute(
+        """
+        SELECT failed_attempts, locked_until
+        FROM auth_state
+        WHERE username = ?
+        """,
+        (username,),
+    )
+    return cursor.fetchone()
+
+
+def update_auth_state(cursor, username, failed_attempts, locked_until=None):
+    """
+    Update authentication state for a user.
+
+    Args:
+        cursor: Database cursor
+        username: Username to update
+        failed_attempts: New failed attempts count
+        locked_until: Lock expiration timestamp (ISO format) or None
+    """
+    cursor.execute(
+        """
+        UPDATE auth_state
+        SET failed_attempts = ?, locked_until = ?
+        WHERE username = ?
+        """,
+        (failed_attempts, locked_until, username),
+    )
+
+
+def insert_auth_state(cursor, username, failed_attempts=0, locked_until=None):
+    """
+    Insert new authentication state record.
+
+    Args:
+        cursor: Database cursor
+        username: Username to insert
+        failed_attempts: Initial failed attempts count (default: 0)
+        locked_until: Lock expiration timestamp (ISO format) or None
+    """
+    cursor.execute(
+        """
+        INSERT INTO auth_state (username, failed_attempts, locked_until)
+        VALUES (?, ?, ?)
+        """,
+        (username, failed_attempts, locked_until),
+    )
+
+
+def reset_auth_state(cursor, username):
+    """
+    Reset authentication state to clean slate.
+
+    Args:
+        cursor: Database cursor
+        username: Username to reset
+    """
+    cursor.execute(
+        """
+        UPDATE auth_state
+        SET failed_attempts = 0, locked_until = NULL
+        WHERE username = ?
+        """,
+        (username,),
+    )
+    # Insert if not exists
+    if cursor.rowcount == 0:
+        insert_auth_state(cursor, username, failed_attempts=0, locked_until=None)

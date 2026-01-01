@@ -4,7 +4,9 @@ CAPTCHA token generation and validation for failed login attempts.
 """
 
 import uuid
-from typing import Dict, Optional
+from typing import Dict
+
+from database import get_auth_state
 
 from . import defenses_const
 
@@ -23,18 +25,12 @@ def should_require_captcha(cursor, username: str) -> bool:
     Returns:
         True if CAPTCHA is required, False otherwise
     """
-    cursor.execute(
-        """
-        SELECT failed_attempts FROM auth_state WHERE username = ?
-        """,
-        (username,),
-    )
-    result = cursor.fetchone()
+    auth_state = get_auth_state(cursor, username)
 
-    if not result:
+    if not auth_state:
         return False
 
-    failed_attempts = result[0]
+    failed_attempts = auth_state[0]
     return failed_attempts >= defenses_const.CAPTCHA_THRESHOLD
 
 
