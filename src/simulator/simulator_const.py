@@ -53,14 +53,12 @@ SERVER_SHUTDOWN_WAIT = 2  # seconds to wait for server to shutdown
 # Target users for brute force
 DEFAULT_BRUTE_FORCE_TARGETS = ["user01", "user02", "user03"]
 
-# Max attempts for testing
-DEFAULT_MAX_ATTEMPTS = 50
-
 # File paths
 SERVER_CONFIG_PATH = "src/server/server_config.json"
 SERVER_PATH = "src/server/server.py"
 SETUP_DB_PATH = "src/server/setup_db.py"
 FILE_USERS_DATA_PATH = "src/data/users.json"
+LOGS_DIRECTORY_PATH = "src/logs/attempts"
 
 # File names
 SERVER_DIR_NAME = "server"

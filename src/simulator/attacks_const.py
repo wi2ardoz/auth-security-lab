@@ -19,3 +19,7 @@ PASSWORD_GEN_NUMBER_RANGE = 10
 # Password file paths
 PASSWORDS_FILE_PATH = "src/data/passwords.json"
 
+# Attack configuration
+DEFAULT_PASSWORD_LIMIT = 4000  # Maximum number of passwords to try in password spraying
+DEFAULT_TIMEOUT = 10  # Default timeout for HTTP requests in seconds
+

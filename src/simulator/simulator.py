@@ -4,6 +4,7 @@ Simulator for testing authentication server with different defense mechanisms.
 Runs attack scenarios against configured server setups.
 """
 
+from glob import glob
 import json
 import random
 import sys
@@ -177,7 +178,43 @@ class SimulatorRunner:
                 print(f"[*] Selected '{selected_user}' from category '{category}'")
         
         return targets
-    
+
+    def rename_log_file(self, attack_type: str):
+        """
+        Rename the most recently modified log file by appending the attack type.
+
+        :param attack_type: Type of attack to append to the filename
+        :return: New file path or None if no log files found
+        """
+        # Define the logs directory path
+        logs_directory = os.path.join(self.root_dir, const.LOGS_DIRECTORY_PATH)
+
+        # Get all files in the logs directory
+        files = [f for f in glob(os.path.join(logs_directory, '*'))
+                 if os.path.isfile(f)]
+
+        if not files:
+            print("[!] No log files found in logs directory")
+            return None
+
+        # Find the most recently modified file
+        most_recent = max(files, key=os.path.getmtime)
+
+        # Extract the file name and extension
+        dir_path = os.path.dirname(most_recent)
+        file_name = os.path.basename(most_recent)
+        name, ext = os.path.splitext(file_name)
+
+        # Create new file name with attack type appended
+        new_name = f"{name}_{attack_type}{ext}"
+        new_path = os.path.join(dir_path, new_name)
+
+        # Rename the file
+        os.rename(most_recent, new_path)
+        print(f"[+] Renamed log file: {file_name} -> {new_name}")
+
+        return new_path
+
     def run_password_spraying_attack(self, server_url: str, usernames: List[str]):
         """
         Run password spraying attack.
@@ -231,7 +268,10 @@ class SimulatorRunner:
             
             # Run attacks based on type
             self.run_password_spraying_attack(server_url, usernames)
-            
+            self.rename_log_file(const.ATTACK_PASSWORD_SPRAYING)
+            # Restart server for new attempt
+            self.stop_server()
+            self.start_server(config)
             # Run brute force on one user from each category
             brute_force_targets = self.get_brute_force_targets_by_category()
             print(brute_force_targets)
@@ -242,6 +282,7 @@ class SimulatorRunner:
                     endpoint=const.DEFAULT_ENDPOINT if config[const.CONFIG_KEY_DEFENSES].get(const.CONFIG_KEY_TOTP) == False
                     else const.TOTP_ENDPOINT
                 )
+            self.rename_log_file(const.ATTACK_BRUTE_FORCE)
         finally:
             if run_server:
                 self.stop_server()
