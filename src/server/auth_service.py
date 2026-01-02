@@ -16,6 +16,13 @@ from defenses import (check_rate_limit, generate_captcha_token,
 from utils import get_hash_settings, log_attempt, utils_const
 
 
+class DefenseResult:
+    """Result of a defense check."""
+
+    def __init__(self, passed: bool, response: Optional[Dict] = None):
+        self.passed = passed
+        self.response = response
+        
 class AuthService:
     """
     Service class that handles authentication logic and defense orchestration.
@@ -385,11 +392,3 @@ class AuthService:
             failure_reason=failure_reason,
             retry_after=retry_after,
         )
-
-
-class DefenseResult:
-    """Result of a defense check."""
-
-    def __init__(self, passed: bool, response: Optional[Dict] = None):
-        self.passed = passed
-        self.response = response
