@@ -7,7 +7,12 @@ Functions for loading/saving server JSON configuration file.
 import json
 import os
 
+from dotenv import load_dotenv
+
 from . import utils_const as const
+
+# Load environment variables from .env file
+load_dotenv()
 
 JSON_INDENT = 4
 
@@ -69,7 +74,6 @@ def get_default_config():
             const.SCHEME_KEY_DEFENSE_TOTP: const.SCHEME_VALUE_DEFENSE_TOTP_DEFAULT,
             const.SCHEME_KEY_DEFENSE_PEPPER: const.SCHEME_VALUE_DEFENSE_PEPPER_DEFAULT,
         },
-        const.SCHEME_KEY_PEPPER_VALUE: const.SCHEME_VALUE_PEPPER_DEFAULT,
         const.SCHEME_KEY_GROUP_SEED: const.SCHEME_VALUE_GROUP_SEED_DEFAULT,
     }
 
@@ -77,11 +81,12 @@ def get_default_config():
 def get_hash_settings(config):
     """
     Get hash mode and pepper settings from config.
+    Pepper value is read from environment variable PEPPER_VALUE.
     :return: Tuple of (hash_mode, pepper)
     """
     hash_mode = config[const.SCHEME_KEY_HASH_MODE]
 
     pepper_enabled = config[const.SCHEME_KEY_DEFENSES][const.SCHEME_KEY_DEFENSE_PEPPER]
-    pepper = config[const.SCHEME_KEY_PEPPER_VALUE] if pepper_enabled else None
+    pepper = os.getenv("PEPPER_VALUE") if pepper_enabled else None
 
     return hash_mode, pepper

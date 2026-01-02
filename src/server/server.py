@@ -6,6 +6,7 @@ Refactored to use AuthService for authentication logic separation.
 """
 
 import sqlite3
+from typing import Optional
 
 import server_const as const
 import uvicorn
@@ -27,7 +28,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
-    captcha_token: str | None = None  # Optional CAPTCHA token
+    captcha_token: Optional[str] = None  # Optional CAPTCHA token
 
 
 class LoginTOTPRequest(BaseModel):

@@ -28,8 +28,8 @@ build/
 .coverage
 htmlcov/
 
-# Environment variables
-.env
+# Environment variables (for educational purposes, .env is tracked)
+# .env - NOT ignored for this educational project
 .env.local
 
 # Database files
