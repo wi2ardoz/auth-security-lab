@@ -9,6 +9,5 @@
         "totp": false,
         "pepper": false
     },
-    "pepper_value": "my_secret_pepper_value",
     "group_seed": "519933725"
 }
