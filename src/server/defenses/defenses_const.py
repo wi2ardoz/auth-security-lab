@@ -14,6 +14,11 @@ SALT_SIZE_BYTES = 32
 # Bcrypt cost factor (work factor: 2^12 iterations)
 BCRYPT_ROUNDS = 12
 
+# Argon2id parameters
+ARGON2_TIME_COST = 1         # Number of iterations
+ARGON2_MEMORY_COST = 65536   # Memory usage in KiB (64 MB)
+ARGON2_PARALLELISM = 1       # Number of parallel threads
+
 # Rate limiting defaults
 RATE_LIMIT_PER_SECOND = 2
 RATE_LIMIT_PER_MINUTE = 10

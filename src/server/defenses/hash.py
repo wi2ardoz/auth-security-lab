@@ -53,7 +53,11 @@ def hash_password(password, hash_mode, salt=None, pepper=None):
         password_with_pepper = password + pepper if pepper else password
 
         # Argon2 generates salt internally
-        ph = PasswordHasher()
+        ph = PasswordHasher(
+            time_cost=const.ARGON2_TIME_COST,
+            memory_cost=const.ARGON2_MEMORY_COST,
+            parallelism=const.ARGON2_PARALLELISM,
+        )
         password_hash = ph.hash(password_with_pepper)
 
         return (password_hash, None)
@@ -89,7 +93,11 @@ def verify_password(password, stored_hash, hash_mode, salt=None, pepper=None):
 
     elif hash_mode == const.HASH_ARGON2ID:
         try:
-            ph = PasswordHasher()
+            ph = PasswordHasher(
+                time_cost=const.ARGON2_TIME_COST,
+                memory_cost=const.ARGON2_MEMORY_COST,
+                parallelism=const.ARGON2_PARALLELISM,
+            )
             password_with_pepper = password + pepper if pepper else password
             ph.verify(stored_hash, password_with_pepper)
             return True
