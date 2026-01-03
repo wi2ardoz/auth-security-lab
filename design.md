@@ -22,7 +22,7 @@
 
 **Components:**
 - **server.py** - Authentication server (FastAPI)
-- **setup_db.py** - Database seeding from users.json
+- **setup_db.py** - Script for resetting DB tables and seeding users.json 
 - **simulator.py** - Attack orchestrator (manual + auto suite)
 
 ## Components
@@ -79,17 +79,11 @@ Note: Can run while server is running (SQLite allows concurrent access).
 
 ### 3. simulator.py (Attack Orchestrator)
 
-Two modes: manual attack OR automated experiment suite.
+Two modes: manual execution OR automated test suite.
 
 **Manual Mode:**
 ```bash
-python src/simulator/simulator.py --attack brute-force --target user01
-python src/simulator/simulator.py --attack password-spraying
-```
-CLI Flags:
-```
---attack <type>     brute-force | password-spraying (manual mode)
---target <user>     Target username (for brute-force in manual mode)
+python src/simulator/simulator.py --manual
 ```
 Note: Assumes server is already running and database is seeded.
 
@@ -98,7 +92,17 @@ Note: Assumes server is already running and database is seeded.
 python src/simulator/simulator.py
 ```
 
-Runs all combinations of hash × defenses × attacks automatically.
+Runs 11 pre-defined scenarios (3 hash baselines + 5 individual defenses + 3 combinations) automatically.
+
+CLI Flags (optional for running a specific scenario):
+```
+--hash <mode>       Specify hash mode
+--rate-limit        Enable rate limiting
+--lockout           Enable lockout
+--captcha           Enable CAPTCHA
+--totp              Enable TOTP
+--pepper            Enable pepper
+```
 
 ## Data Flow
 
@@ -111,33 +115,35 @@ Terminal 1: Start server with configuration
 Terminal 2: Seed database (optional - or use /register API)
   $ python src/server/setup_db.py
 
-Terminal 3: Run single attack
-  $ python src/simulator/simulator.py --attack brute-force --target user01
+Terminal 3: Run attacks in manual mode
+  $ python src/simulator/simulator.py --manual
 
-Server logs to: src/logs/attempts/attempts_<hash>_<defenses>.log
-After attack completes, log is renamed to include attack type.
+Server logs to: src/logs/attempts/
+Logs created:
+  - attempts_bcrypt_pepper_ratelimit_password_spraying.log
+  - attempts_bcrypt_pepper_ratelimit_brute_force.log
 ```
 
 ### Automated Test Suite Workflow
 
 ```
-$ python src/simulator/simulator.py
+$ python src/simulator/simulator.py --all
 
-Behind the scenes:
-  For each hash_mode in [sha256, bcrypt, argon2id]:
-    For each defense_combo in [none, pepper, rate-limit, ...]:
-      For each attack_type in [brute-force, password-spraying]:
-        1. Start server: python server.py --hash <mode> <defenses> &
-        2. Seed database: python setup_db.py
-        3. Wait for server ready
-        4. Run attack via HTTP requests to /login
-        5. Stop server
-        6. Rename log: attempts_<hash>_<defenses>.log ->
-                       attempts_<hash>_<defenses>_<attack>.log
-        7. Move log to suite directory
+Behind the scenes (11 scenarios total):
+  For each scenario in SCENARIOS:
+    1. Start server: python server.py --hash <mode> <defenses> &
+    2. Seed database: python setup_db.py
+    3. Wait for server ready
+    4. Run password-spraying attack via HTTP to /login
+    5. Rename log: attempts_<hash>_<defenses>_password_spraying.log
+    6. Restart server with same configuration
+    7. Reset database: python setup_db.py (clean state for next attack)
+    8. Run brute-force attacks via HTTP to /login
+    9. Rename log: attempts_<hash>_<defenses>_brute_force.log
+    10. Stop server
 
-  After all experiments:
-    Generate summary.csv from all logs
+All logs saved to: src/logs/attempts/
+Total attack runs: 22 (11 scenarios × 2 attack types)
 ```
 
 ## Log Format
@@ -146,21 +152,19 @@ Behind the scenes:
 
 ```
 src/logs/
-|-- suite_20250116_143022/          # Auto suite mode
-|   |-- attempts_sha256_none_bruteforce.log
-|   |-- attempts_sha256_none_passwordspraying.log
-|   |-- attempts_sha256_pepper_bruteforce.log
-|   |-- attempts_bcrypt_none_bruteforce.log
-|   |-- attempts_bcrypt_pepper_bruteforce.log
-|   |-- ...
-|   +-- summary.csv                 # Aggregate statistics
-|
-|-- suite_20250116_151500/          # Next suite run
-    |-- attempts_*.log
-    +-- summary.csv
++-- attempts/                        # All attack logs
+    |-- attempts_sha256_none_password_spraying.log
+    |-- attempts_sha256_none_brute_force.log
+    |-- attempts_sha256_ratelimit_password_spraying.log
+    |-- attempts_sha256_ratelimit_brute_force.log
+    |-- attempts_bcrypt_none_password_spraying.log
+    |-- attempts_bcrypt_none_brute_force.log
+    |-- attempts_argon2id_none_password_spraying.log
+    |-- attempts_argon2id_none_brute_force.log
+    +-- ...
 ```
 
-**Manual mode:** Logs go to `src/logs/attempts/attempts_<hash>_<defenses>_<attack>.log`
+Both manual and auto modes save logs to `src/logs/attempts/`
 
 ### attempts_*.log Format (JSON lines)
 
@@ -171,6 +175,7 @@ Each line is a JSON object representing one authentication attempt:
 {
   "timestamp": "2025-01-16T15:30:45.123Z",
   "username": "user01",
+
   "hash_mode": "bcrypt",
   "protection_flags": {
     "rate_limit": true,
@@ -179,27 +184,18 @@ Each line is a JSON object representing one authentication attempt:
     "totp": false,
     "pepper": true
   },
+
   "result": "failure",
-  "latency_ms": 245,
-  "group_seed": "519933725"
+  "failure_reason": "INVALID_CREDENTIALS",
+  "totp_required": false,
+  "retry_after": 0.5,
+
+  "latency_ms": null,
+  "cpu_time_ms": null,
+  "memory_delta_kb": null,
+
+  "group_seed": "519933725",
 }
-```
-
-### summary.csv Format
-
-Location: Inside each suite directory (e.g., `suite_20250116_143022/summary.csv`)
-
-Columns:
-```
-hash_mode, rate_limit, lockout, captcha, totp, pepper, attack_type,
-total_attempts, attempts_per_second, time_to_first_success,
-average_latency_ms, success_rate_weak, success_rate_medium,
-success_rate_strong, group_seed
-```
-
-Example row:
-```
-bcrypt,true,false,false,false,true,brute_force,1523,12.4,122.5,243,0.8,0.2,0.0,519933725
 ```
 
 ## users.json Format
@@ -233,12 +229,28 @@ Categories:
 
 ## Database
 
-Location: src/server/db/
+Location: src/server/db/auth.db
 
 SQLite database storing user credentials and authentication state.
 
-Files:
-- auth.db - Main database with users table
+**Tables:**
+
+1. **users** - User credentials
+   - username (TEXT PRIMARY KEY)
+   - password_hash (TEXT)
+   - salt (TEXT)
+   - totp_secret (TEXT, nullable)
+
+2. **auth_state** - Defense mechanism state tracking
+   - username (TEXT PRIMARY KEY)
+   - failed_attempts (INTEGER) - Used by lockout and CAPTCHA defenses
+   - locked_until (REAL, nullable) - Unix timestamp for lockout expiration
+   - last_attempt (REAL, nullable) - Unix timestamp of last login attempt
+
+**Notes:**
+- Database is reset between attack types within each scenario (clean state isolation)
+- Pepper value is NOT stored in database (kept in .env file)
+- TOTP secrets are pre-generated and stored per user
 
 ## server_config.json Format
 
@@ -256,23 +268,6 @@ Location: src/server/config/server_config.json
     "totp": false,
     "pepper": true
   },
-  "pepper_value": "secret_pepper_not_in_db",
   "group_seed": "519933725"
 }
 ```
-
-## Report Generation
-
-Steps:
-1. List all files in src/logs/suite_DATE_HOUR/
-2. For each log file:
-   - Parse filename for hash_mode, defenses, attack_type
-   - Read JSON lines
-   - Join with users.json to get password category
-   - Calculate metrics:
-      - total_attempts = count of lines
-      - attempts_per_second = total / (last_timestamp - first_timestamp)
-      - time_to_first_success = first success timestamp - first timestamp
-      - average_latency_ms = mean of latency_ms
-      - success_rate_by_category = successes / attempts per category
-3. Append row to summary.csv

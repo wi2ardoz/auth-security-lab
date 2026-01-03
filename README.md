@@ -58,35 +58,45 @@ pip install -r requirements.txt
 Project/
 |-- src/
 |   |-- server/
-|   |   |-- database.py             # SQLite database management
-|   |   |-- server.py               # Auth server (FastAPI + SQLite)
-|   |   |-- server_const.py         # Server constants
-|   |   |-- setup_db.py             # Database seeder from users.json
+|   |   |-- defenses/                # Defense implementations
+|   |   |   |-- __init__.py
+|   |   |   |-- hash.py              # Password hashing (sha256/bcrypt/argon2id)
+|   |   |   |-- rate_limiter.py      # Rate limiting defense
+|   |   |   |-- account_lockout.py   # Account lockout defense
+|   |   |   |-- captcha.py           # CAPTCHA defense
+|   |   |   |-- totp.py              # TOTP two-factor authentication
+|   |   |   +-- defenses_const.py    # Defense constants
+|   |   |-- utils/                   # Server utilities
+|   |   |   |-- __init__.py
+|   |   |   |-- config.py            # Config load/save
+|   |   |   |-- logger.py            # Authentication logging
+|   |   |   |-- cli.py               # CLI parsing
+|   |   |   +-- utils_const.py       # Config schema constants
 |   |   |-- config/
-|   |   |   +-- server_config.json  # Hash mode + defense toggles
-|   |   |-- db/                     # SQLite database
+|   |   |   +-- server_config.json   # Hash mode + defense toggles
+|   |   |-- db/                      # SQLite database
 |   |   |   +-- auth.db
-|   |   |-- defenses/               # Defense implementations
-|   |   |   |-- hash.py             # Password hashing (sha256/bcrypt/argon2id)
-|   |   |   +-- defenses_const.py   # Defense constants
-|   |   +-- utils/                  # Server utilities
-|   |       |-- config.py           # Config load/save
-|   |       |-- cli.py              # CLI parsing
-|   |       +-- utils_const.py      # Config schema constants
+|   |   |-- auth_service.py          # Authentication service orchestrator
+|   |   |-- database.py              # SQLite database management
+|   |   |-- server.py                # Auth server (FastAPI + SQLite)
+|   |   |-- server_const.py          # Server constants
+|   |   +-- setup_db.py              # Database seeder from users.json
 |   |
 |   |-- simulator/
-|   |   +-- simulator.py            # Attack orchestrator (manual + auto suite)
+|   |   |-- simulator.py             # Attack orchestrator (manual + auto suite)
+|   |   |-- simulator_const.py       # Simulator constants and scenarios
+|   |   |-- attacks.py               # Attack implementations
+|   |   +-- attacks_const.py         # Attack constants
 |   |
 |   |-- data/
-|   |   +-- users.json              # 30 test accounts (weak/medium/strong)
+|   |   |-- users.json               # 30 test accounts (weak/medium/strong)
+|   |   +-- passwords.json           # Password list for attacks
 |   |
 |   +-- logs/
-|       |-- suite_20250116_143022/  # Auto suite results
-|       |   |-- attempts_sha256_none_bruteforce.log
-|       |   |-- attempts_bcrypt_pepper_bruteforce.log
-|       |   +-- summary.csv
-|       |
-|       +-- suite_20250116_151500/  # Next suite run
+|       +-- attempts/                # Attack logs
+|           |-- attempts_sha256_none_password_spraying.log
+|           |-- attempts_sha256_none_brute_force.log
+|           |-- attempts_bcrypt_none_password_spraying.log
 |           +-- ...
 |
 |-- requirements.txt
@@ -114,27 +124,19 @@ pip freeze > requirements.txt
 
 ### Automated Test Suite (Recommended)
 
-Run all experiments automatically:
+Run all scenarios automatically:
 
 ```bash
 python src/simulator/simulator.py
 ```
 
 **Output:**
-- Interactive prompt with experiment info
-- Real-time progress for each experiment
-- Results saved to `src/logs/suite_<timestamp>/`
-- Generates `summary.csv` with aggregate statistics
+- Real-time progress for each scenario
+- Results saved to `src/logs/attempts/`
+- Log files: `attempts_<hash>_<defenses>_<attack>.log`
 
 **What it does:**
-- Tests all combinations: 3 hash modes × 5 defense configs × 2 attack types = 30 experiments
-- For each experiment:
-  1. Starts server with specific configuration
-  2. Seeds database with users.json
-  3. Runs attack (brute-force or password-spraying)
-  4. Collects logs
-  5. Stops server
-- Estimated time: 2 hours
+- Tests 11 pre-defined scenarios (3 hash baselines + 5 individual defenses + 3 combinations)
 
 ---
 
@@ -170,7 +172,7 @@ CLI flags update `server_config.json` and define experiment configuration.
 **Step 2: Seed database (Optional)**
 
 ```bash
-# Option A: Use setup_db.py (seeds all 30 users)
+# Option A: Use setup_db.py (seeds 30 users + resets the authentication state DB table)
 python src/server/setup_db.py
 
 # Option B: Use /register API (manual registration)
@@ -182,12 +184,11 @@ curl -X POST http://localhost:8000/register \
 **Step 3: Run attack**
 
 ```bash
-# Brute-force attack on single user
-python src/simulator/simulator.py --attack brute-force --target user01
-
-# Password-spraying attack on all users
-python src/simulator/simulator.py --attack password-spraying
+# Run both attacks (password-spraying + brute-force) in manual mode
+python src/simulator/simulator.py --manual
 ```
+
+**Note:** The `--manual` flag runs attacks without starting/stopping the server automatically. You must start the server manually in Step 1.
 
 ### Deactivating Environment
 
@@ -201,7 +202,7 @@ deactivate
 Two-factor authentication mechanism generating temporary codes derived from a shared secret. Each code is valid for a short time period (typically 30 seconds).
 
 ### Password-Spraying
-Attack method using a small set of common passwords against many user accounts, as opposed to Brute-Force which targets a single account.
+Attack method using a small set of common passwords against many user accounts, as opposed to Brute-Force which targets a single account. Successfully compromised users are immediately removed from the target list to prevent redundant attempts.
 
 ### Pepper
 Global secret value added to passwords before hashing, stored separately from the database. Unlike salt (which is per-user and stored with the hash), pepper is global and kept as a secret.
@@ -229,9 +230,8 @@ Unique identifier for each team, calculated as: `SEED_GROUP = ID1 XOR ID2` (bitw
 - Pepper
 
 ### 4. Attack Scenarios
-- Brute-Force: Targeted attack on single account
+- Brute-Force: Targeted attack on multiple accounts ordered by password strength
 - Password-Spraying: Common passwords across multiple accounts
-- Combined protection mechanisms
 
 ### 5. Metrics Collection
 - Total attempts
