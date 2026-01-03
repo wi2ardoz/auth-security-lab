@@ -260,6 +260,8 @@ Unique identifier for each team, calculated as: `SEED_GROUP = ID1 XOR ID2` (bitw
 
 ## Version History
 
+- **v1.0** (Ready Version)
+  - Adjust maximum password to try for password-spray attack. 
 - **v0.4** (Integration Server-Simulator)
   - Password spraying: Remove cracked users from target list
   - Brute force: Attack users ordered by password strength
