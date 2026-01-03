@@ -260,18 +260,29 @@ Unique identifier for each team, calculated as: `SEED_GROUP = ID1 XOR ID2` (bitw
 
 ## Version History
 
-- **v3.0**
+- **v0.4** (Integration Server-Simulator)
+  - Password spraying: Remove cracked users from target list
+  - Brute force: Attack users ordered by password strength
+  - Add more metrics fields to logs 
+  - Fix integration bugs
+- **v0.3** (Attack Mechanism and Simulator)
+  - Create Simulator for running attacks both manually and automatically
+  - Create attack scenarios
+  - Add attacks API
+  - Relocate pepper value for .env file (not ignored for educational purpose only)
+- **v0.2** (Defense Mechanisms)
   - Add protection mechanisms: Rate-Limit, account lockout, TOTP, CAPTCHA
   - Add `auth_state` table for database
-  - Refactor authentication service in `server.py`
-- **v2.0**
-  - Added FastAPI-based auth server with CLI configuration and SQLite DB
+  - Refactor authentication service in `auth_service.py`
+  - Pepper support via environment variable
+- **v0.1** (Server Implementation)
+  - FastAPI-based auth server with CLI configuration and SQLite DB
   - Database seeder: src/server/setup_db.py (imports 30 test accounts from src/data/users.json)
   - Password hashing implementations: SHA-256+salt, bcrypt, Argon2id
   - Global pepper support and per-user salt handling
   - Structured server logging: login attempts
   - Config management: src/server/config/server_config.json
-- **v1.0** (Initial Release) - Project setup and documentation
+- **v0.0** (Initial Release)
   - Python project structure initialized
   - Virtual environment configured
   - README and design documents created
