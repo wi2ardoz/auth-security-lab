@@ -8,3 +8,4 @@ argon2-cffi
 pyotp
 requests
 python-dotenv
+psutil

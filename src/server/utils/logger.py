@@ -60,19 +60,19 @@ def init_log_file(log_filepath):
             pass  # Create empty file
 
 
-def log_attempt(log_filepath, username, result, latency_ms, config,
-    failure_reason=None, retry_after=None, totp_required=False):
+def log_attempt(log_filepath, username, result, config,
+    failure_reason=None, retry_after=None, totp_required=False, metrics=None):
     """
     Log a single authentication attempt as JSON line.
 
     :param log_filepath: Full path to log file
     :param username: Username attempted
     :param result: "success" or "failure"
-    :param latency_ms: Request latency in milliseconds
     :param config: Server configuration dictionary
     :param failure_reason: Optional reason for failure (rate_limited, invalid_credentials, etc.)
     :param retry_after: Optional seconds until retry allowed (for rate limiting)
     :param totp_required: Whether TOTP second factor is required (for success with pending TOTP)
+    :param metrics: Optional dict with latency_ms, cpu_time_ms, memory_delta_kb
     """
     timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
@@ -91,8 +91,10 @@ def log_attempt(log_filepath, username, result, latency_ms, config,
         "totp_required": totp_required,
         "retry_after": None,
 
-        # Performance
-        "latency_ms": round(latency_ms, 2),
+        # Performance & Resource Usage
+        "latency_ms": metrics["latency_ms"] if metrics else None,
+        "cpu_time_ms": metrics["cpu_time_ms"] if metrics else None,
+        "memory_delta_kb": metrics["memory_delta_kb"] if metrics else None,
 
         # Metadata
         "group_seed": config[utils_const.SCHEME_KEY_GROUP_SEED],
