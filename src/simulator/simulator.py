@@ -293,12 +293,11 @@ class SimulatorRunner:
             brute_force_targets = self.get_brute_force_targets_by_category()
             print(brute_force_targets)
             for target_user in brute_force_targets:
-                # Adjust timeout for remaining time in scenario
+                # Always use /login endpoint (TOTP is handled in defense response)
                 elapsed_time = self.run_brute_force_attack(
                     server_url,
                     target_user,
-                    endpoint=const.DEFAULT_ENDPOINT if config[const.CONFIG_KEY_DEFENSES].get(const.CONFIG_KEY_TOTP) == False
-                    else const.TOTP_ENDPOINT,
+                    endpoint=const.DEFAULT_ENDPOINT,
                     start_time=scenario_start_time
                 )
             self.rename_log_file(const.ATTACK_BRUTE_FORCE)
