@@ -15,7 +15,6 @@ import argparse
 import simulator_const as const
 from attacks import password_spraying, brute_force_attack
 import os
-from pathlib import Path
 
 
 
@@ -86,15 +85,18 @@ class SimulatorRunner:
                 
                 if defenses.get(const.CONFIG_KEY_PEPPER):
                     cmd.append("--pepper")
-        
         # Set working directory to server folder
-        
         # Start server as subprocess
+        # Set UTF-8 encoding to handle Unicode output on Windows
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+
         self.server_process = subprocess.Popen(
             cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            cwd=self.root_dir
+            cwd=self.root_dir,
+            env=env
         )
         
         # Wait for server to start
@@ -129,16 +131,22 @@ class SimulatorRunner:
         """
         Reset the database by running setup_db.py to repopulate with initial users.
         """
-        
+
         print("[*] Resetting database...")
+
+        # Set UTF-8 encoding to handle Unicode output on Windows
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
 
         result = subprocess.run(
             [sys.executable, const.SETUP_DB_PATH],
             capture_output=True,
             text=True,
-            cwd=self.root_dir
+            cwd=self.root_dir,
+            env=env,
+            encoding='utf-8'
         )
-        
+
         if result.returncode == 0:
             print("[+] Database reset successfully")
         else:
@@ -215,28 +223,32 @@ class SimulatorRunner:
 
         return new_path
 
-    def run_password_spraying_attack(self, server_url: str, usernames: List[str]):
+    def run_password_spraying_attack(self, server_url: str, usernames: List[str], start_time: float = None):
         """
         Run password spraying attack.
-        
+
         :param server_url: Server URL
         :param usernames: List of usernames to target
+        :param start_time: Optional scenario start time for timeout tracking
+        :return: Elapsed time since start_time
         """
         print("\nRUNNING ATTACK: Password Spraying")
-        
-        password_spraying(server_url, usernames)
-    
-    def run_brute_force_attack(self, server_url: str, target_username: str, endpoint):
+
+        return password_spraying(server_url, usernames, start_time=start_time)
+
+    def run_brute_force_attack(self, server_url: str, target_username: str, endpoint, start_time: float = None):
         """
         Run brute force attack against a specific user.
-        
+
         :param server_url: Server URL
         :param target_username: Username to target
-        :param max_attempts: Maximum attempts to make
+        :param endpoint: Login endpoint to use
+        :param start_time: Optional scenario start time for timeout tracking
+        :return: Elapsed time since start_time
         """
         print(f"\nRUNNING ATTACK: Brute Force (Target: {target_username})")
-        
-        brute_force_attack(server_url, target_username, endpoint=endpoint)
+
+        return brute_force_attack(server_url, target_username, endpoint=endpoint, start_time=start_time)
     
     def run_with_config(self, config: Dict, run_server):
         """
@@ -260,27 +272,34 @@ class SimulatorRunner:
             self.reset_database()
         
         try:
+            # Start scenario timer
+            scenario_start_time = time.time()
+
             # Set server URL
             server_url = f"{const.SERVER_HOST}:{const.SERVER_PORT}"
-            
+
             # Get all usernames
             usernames = self.get_usernames_from_data()
-            
+
             # Run attacks based on type
-            self.run_password_spraying_attack(server_url, usernames)
+            elapsed_time = self.run_password_spraying_attack(server_url, usernames, start_time=scenario_start_time)
             self.rename_log_file(const.ATTACK_PASSWORD_SPRAYING)
+
             # Restart server for new attempt
             self.stop_server()
             self.start_server(config)
+
             # Run brute force on one user from each category
             brute_force_targets = self.get_brute_force_targets_by_category()
             print(brute_force_targets)
             for target_user in brute_force_targets:
-                self.run_brute_force_attack(
+                # Adjust timeout for remaining time in scenario
+                elapsed_time = self.run_brute_force_attack(
                     server_url,
                     target_user,
                     endpoint=const.DEFAULT_ENDPOINT if config[const.CONFIG_KEY_DEFENSES].get(const.CONFIG_KEY_TOTP) == False
-                    else const.TOTP_ENDPOINT
+                    else const.TOTP_ENDPOINT,
+                    start_time=scenario_start_time
                 )
             self.rename_log_file(const.ATTACK_BRUTE_FORCE)
         finally:

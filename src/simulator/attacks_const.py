@@ -22,4 +22,5 @@ PASSWORDS_FILE_PATH = "src/data/passwords.json"
 # Attack configuration
 DEFAULT_PASSWORD_LIMIT = 4000  # Maximum number of passwords to try in password spraying
 DEFAULT_TIMEOUT = 10  # Default timeout for HTTP requests in seconds
+ATTACK_TIMEOUT = 7200   # Maximum time for an attack in seconds (2 hours = 120 minutes)
 

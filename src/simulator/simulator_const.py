@@ -43,6 +43,12 @@ SCENARIO_DESC_LOCKOUT = "SHA-256 hashing + account lockout after failed attempts
 SCENARIO_NAME_CAPTCHA = "CAPTCHA Challenge"
 SCENARIO_DESC_CAPTCHA = "SHA-256 hashing + CAPTCHA verification"
 
+SCENARIO_NAME_PEPPER = "Pepper Defense"
+SCENARIO_DESC_PEPPER = "SHA-256 hashing + pepper (secret key)"
+
+SCENARIO_NAME_TOTP = "Two-Factor Authentication (TOTP)"
+SCENARIO_DESC_TOTP = "SHA-256 hashing + TOTP-based 2FA"
+
 SCENARIO_NAME_FULL_DEFENSES = "Full Security Suite"
 SCENARIO_DESC_FULL_DEFENSES = "All defenses enabled (Argon2id + rate limit + lockout + pepper)"
 
@@ -93,19 +99,19 @@ SCENARIOS =  [
                 }
             }
         },
-        {
-            "name": SCENARIO_NAME_BCRYPT_HASHING,
-            "config": {
-                CONFIG_KEY_HASH_MODE: BCRYPT_HASHING,
-                CONFIG_KEY_DEFENSES: {
-                    CONFIG_KEY_RATE_LIMIT: False,
-                    CONFIG_KEY_LOCKOUT: False,
-                    CONFIG_KEY_CAPTCHA: False,
-                    CONFIG_KEY_TOTP: False,
-                    CONFIG_KEY_PEPPER: False
-                }
-            }
-        },
+        # {
+        #     "name": SCENARIO_NAME_BCRYPT_HASHING,
+        #     "config": {
+        #         CONFIG_KEY_HASH_MODE: BCRYPT_HASHING,
+        #         CONFIG_KEY_DEFENSES: {
+        #             CONFIG_KEY_RATE_LIMIT: False,
+        #             CONFIG_KEY_LOCKOUT: False,
+        #             CONFIG_KEY_CAPTCHA: False,
+        #             CONFIG_KEY_TOTP: False,
+        #             CONFIG_KEY_PEPPER: False
+        #         }
+        #     }
+        # },
         {
             "name": SCENARIO_NAME_STRONG_HASHING,
             "config": {
@@ -154,6 +160,32 @@ SCENARIOS =  [
                     CONFIG_KEY_LOCKOUT: False,
                     CONFIG_KEY_CAPTCHA: True,
                     CONFIG_KEY_TOTP: False,
+                    CONFIG_KEY_PEPPER: False
+                }
+            }
+        },
+        {
+            "name": SCENARIO_NAME_PEPPER,
+            "config": {
+                CONFIG_KEY_HASH_MODE: SHA256_HASHING,
+                CONFIG_KEY_DEFENSES: {
+                    CONFIG_KEY_RATE_LIMIT: False,
+                    CONFIG_KEY_LOCKOUT: False,
+                    CONFIG_KEY_CAPTCHA: False,
+                    CONFIG_KEY_TOTP: False,
+                    CONFIG_KEY_PEPPER: True
+                }
+            }
+        },
+        {
+            "name": SCENARIO_NAME_TOTP,
+            "config": {
+                CONFIG_KEY_HASH_MODE: SHA256_HASHING,
+                CONFIG_KEY_DEFENSES: {
+                    CONFIG_KEY_RATE_LIMIT: False,
+                    CONFIG_KEY_LOCKOUT: False,
+                    CONFIG_KEY_CAPTCHA: False,
+                    CONFIG_KEY_TOTP: True,
                     CONFIG_KEY_PEPPER: False
                 }
             }

