@@ -92,15 +92,16 @@ class AuthService:
                 reset_failed_attempts(cursor, username)
 
             # Defense 4: TOTP (Two-Factor Authentication)
+            # Password verified successfully, but second factor still required
             if defenses.get(utils_const.SCHEME_KEY_DEFENSE_TOTP, False) and totp_secret:
                 self._log_attempt(
                     username,
                     start_time,
-                    const.LOG_RESULT_FAILURE,
-                    failure_reason=const.FAILURE_REASON_TOTP_REQUIRED,
+                    const.LOG_RESULT_SUCCESS,
+                    totp_required=True,
                 )
                 return {
-                    "status": const.SERVER_FAILURE,
+                    "status": const.SERVER_SUCCESS,
                     "message": const.SERVER_MSG_TOTP_REQUIRED,
                     "totp_required": True,
                 }
@@ -371,7 +372,8 @@ class AuthService:
     
     def _log_attempt(self, username: str, start_time: float, result: str,
                      failure_reason: Optional[str] = None,
-                     retry_after: Optional[int] = None):
+                     retry_after: Optional[int] = None,
+                     totp_required: bool = False):
         """
         Helper to log authentication attempt with automatic latency calculation.
 
@@ -381,6 +383,7 @@ class AuthService:
             result: const.LOG_RESULT_SUCCESS or const.LOG_RESULT_FAILURE
             failure_reason: Optional reason for failure
             retry_after: Optional seconds until retry allowed (for rate limiting)
+            totp_required: Whether TOTP second factor is required (for success with pending TOTP)
         """
         latency_ms = (time.time() - start_time) * 1000
         log_attempt(
@@ -391,4 +394,5 @@ class AuthService:
             self.config,
             failure_reason=failure_reason,
             retry_after=retry_after,
+            totp_required=totp_required,
         )

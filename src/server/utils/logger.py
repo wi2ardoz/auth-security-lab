@@ -60,8 +60,8 @@ def init_log_file(log_filepath):
             pass  # Create empty file
 
 
-def log_attempt(log_filepath, username, result, latency_ms, config, 
-    failure_reason=None, retry_after=None):
+def log_attempt(log_filepath, username, result, latency_ms, config,
+    failure_reason=None, retry_after=None, totp_required=False):
     """
     Log a single authentication attempt as JSON line.
 
@@ -72,6 +72,7 @@ def log_attempt(log_filepath, username, result, latency_ms, config,
     :param config: Server configuration dictionary
     :param failure_reason: Optional reason for failure (rate_limited, invalid_credentials, etc.)
     :param retry_after: Optional seconds until retry allowed (for rate limiting)
+    :param totp_required: Whether TOTP second factor is required (for success with pending TOTP)
     """
     timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
@@ -79,19 +80,20 @@ def log_attempt(log_filepath, username, result, latency_ms, config,
         # ID & Time
         "timestamp": timestamp,
         "username": username,
-        
+
         # Security
         "hash_mode": config[utils_const.SCHEME_KEY_HASH_MODE],
         "protection_flags": config[utils_const.SCHEME_KEY_DEFENSES].copy(),
-        
+
         # Outcome
         "result": result,
         "failure_reason": None,
+        "totp_required": totp_required,
         "retry_after": None,
-        
+
         # Performance
         "latency_ms": round(latency_ms, 2),
-        
+
         # Metadata
         "group_seed": config[utils_const.SCHEME_KEY_GROUP_SEED],
     }
