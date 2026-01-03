@@ -3,9 +3,11 @@ auth_service.py
 Authentication service that orchestrates defense mechanisms and user verification.
 """
 
+import os
 import time
 from typing import Dict, Optional, Tuple
 
+import psutil
 import server_const as const
 from database import get_db_cursor, get_user
 from defenses import (check_rate_limit, generate_captcha_token,
@@ -14,6 +16,16 @@ from defenses import (check_rate_limit, generate_captcha_token,
                       validate_captcha_token, validate_totp_code,
                       verify_password)
 from utils import get_hash_settings, log_attempt, utils_const
+
+
+class ResourceTracker:
+    """Tracks resource usage for an authentication request."""
+
+    def __init__(self):
+        self.start_time = time.time()
+        self.process = psutil.Process(os.getpid())
+        self.cpu_times_start = self.process.cpu_times()
+        self.memory_start = self.process.memory_info().rss
 
 
 class DefenseResult:
@@ -59,28 +71,29 @@ class AuthService:
         Returns:
             Response dictionary with status and message
         """
-        start_time = time.time()
+        # Initialize resource tracking
+        tracker = ResourceTracker()
         defenses = self.config.get(utils_const.SCHEME_KEY_DEFENSES, {})
 
         with get_db_cursor() as cursor:
             # Defense 1: Account Lockout
-            result = self._check_account_lockout(cursor, username, start_time)
+            result = self._check_account_lockout(cursor, username, tracker)
             if not result.passed:
                 return result.response
 
             # Defense 2: Rate Limiting
-            result = self._check_rate_limit(username, start_time)
+            result = self._check_rate_limit(username, tracker)
             if not result.passed:
                 return result.response
 
             # Defense 3: CAPTCHA
-            result = self._check_captcha(cursor, username, captcha_token, start_time)
+            result = self._check_captcha(cursor, username, captcha_token, tracker)
             if not result.passed:
                 return result.response
 
             # Verify user and password
             verified, totp_secret, error_response = self._verify_user_and_password(
-                cursor, username, password, start_time
+                cursor, username, password, tracker
             )
             if not verified:
                 return error_response
@@ -92,21 +105,22 @@ class AuthService:
                 reset_failed_attempts(cursor, username)
 
             # Defense 4: TOTP (Two-Factor Authentication)
+            # Password verified successfully, but second factor still required
             if defenses.get(utils_const.SCHEME_KEY_DEFENSE_TOTP, False) and totp_secret:
                 self._log_attempt(
                     username,
-                    start_time,
-                    const.LOG_RESULT_FAILURE,
-                    failure_reason=const.FAILURE_REASON_TOTP_REQUIRED,
+                    const.LOG_RESULT_SUCCESS,
+                    totp_required=True,
+                    tracker=tracker,
                 )
                 return {
-                    "status": const.SERVER_FAILURE,
+                    "status": const.SERVER_SUCCESS,
                     "message": const.SERVER_MSG_TOTP_REQUIRED,
                     "totp_required": True,
                 }
 
             # Complete success (no TOTP required)
-            self._log_attempt(username, start_time, const.LOG_RESULT_SUCCESS)
+            self._log_attempt(username, const.LOG_RESULT_SUCCESS, tracker=tracker)
             return {
                 "status": const.SERVER_SUCCESS,
                 "message": const.SERVER_MSG_LOGIN_OK,
@@ -181,7 +195,7 @@ class AuthService:
                     "message": const.SERVER_MSG_TOTP_INVALID,
                 }
 
-    def _check_account_lockout(self, cursor, username: str, start_time: float) -> DefenseResult:
+    def _check_account_lockout(self, cursor, username: str, tracker: ResourceTracker) -> DefenseResult:
         """
         Defense 1: Account Lockout
 
@@ -190,7 +204,7 @@ class AuthService:
         Args:
             cursor: Database cursor
             username: Username to check
-            start_time: Request start time
+            tracker: ResourceTracker for performance metrics
 
         Returns:
             DefenseResult with passed=False if account is locked
@@ -203,9 +217,9 @@ class AuthService:
         if locked:
             self._log_attempt(
                 username,
-                start_time,
                 const.LOG_RESULT_FAILURE,
                 failure_reason=const.FAILURE_REASON_ACCOUNT_LOCKED,
+                tracker=tracker,
             )
             return DefenseResult(
                 passed=False,
@@ -217,7 +231,7 @@ class AuthService:
             )
         return DefenseResult(passed=True)
 
-    def _check_rate_limit(self, username: str, start_time: float) -> DefenseResult:
+    def _check_rate_limit(self, username: str, tracker: ResourceTracker) -> DefenseResult:
         """
         Defense 2: Rate Limiting
 
@@ -225,7 +239,7 @@ class AuthService:
 
         Args:
             username: Username to check
-            start_time: Request start time
+            tracker: ResourceTracker for performance metrics
 
         Returns:
             DefenseResult with passed=False if rate limit exceeded
@@ -238,10 +252,10 @@ class AuthService:
         if not allowed:
             self._log_attempt(
                 username,
-                start_time,
                 const.LOG_RESULT_FAILURE,
                 failure_reason=const.FAILURE_REASON_RATE_LIMITED,
                 retry_after=retry_after,
+                tracker=tracker,
             )
             return DefenseResult(
                 passed=False,
@@ -254,7 +268,7 @@ class AuthService:
         return DefenseResult(passed=True)
 
     def _check_captcha(self, cursor, username: str, captcha_token: Optional[str],
-                       start_time: float) -> DefenseResult:
+                       tracker: ResourceTracker) -> DefenseResult:
         """
         Defense 3: CAPTCHA
 
@@ -264,7 +278,7 @@ class AuthService:
             cursor: Database cursor
             username: Username to check
             captcha_token: CAPTCHA token provided by user (optional)
-            start_time: Request start time
+            tracker: ResourceTracker for performance metrics
 
         Returns:
             DefenseResult with passed=False if CAPTCHA required or invalid
@@ -280,9 +294,9 @@ class AuthService:
                 token = generate_captcha_token(username)
                 self._log_attempt(
                     username,
-                    start_time,
                     const.LOG_RESULT_FAILURE,
                     failure_reason=const.FAILURE_REASON_CAPTCHA_REQUIRED,
+                    tracker=tracker,
                 )
                 return DefenseResult(
                     passed=False,
@@ -298,9 +312,9 @@ class AuthService:
                 if not validate_captcha_token(username, captcha_token):
                     self._log_attempt(
                         username,
-                        start_time,
                         const.LOG_RESULT_FAILURE,
                         failure_reason=const.FAILURE_REASON_CAPTCHA_INVALID,
+                        tracker=tracker,
                     )
                     return DefenseResult(
                         passed=False,
@@ -312,7 +326,7 @@ class AuthService:
         return DefenseResult(passed=True)
 
     def _verify_user_and_password(self, cursor, username: str, password: str,
-                                   start_time: float) -> Tuple[bool, Optional[str], Optional[Dict]]:
+                                   tracker: ResourceTracker) -> Tuple[bool, Optional[str], Optional[Dict]]:
         """
         Verify user exists and password is correct.
 
@@ -320,7 +334,7 @@ class AuthService:
             cursor: Database cursor
             username: Username to verify
             password: Password to verify
-            start_time: Request start time
+            tracker: ResourceTracker for performance metrics
 
         Returns:
             Tuple of (success, totp_secret, error_response)
@@ -335,9 +349,9 @@ class AuthService:
         if user is None:
             self._log_attempt(
                 username,
-                start_time,
                 const.LOG_RESULT_FAILURE,
                 failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+                tracker=tracker,
             )
             return False, None, {
                 "status": const.SERVER_FAILURE,
@@ -358,9 +372,9 @@ class AuthService:
 
             self._log_attempt(
                 username,
-                start_time,
                 const.LOG_RESULT_FAILURE,
                 failure_reason=const.FAILURE_REASON_INVALID_CREDENTIALS,
+                tracker=tracker,
             )
             return False, None, {
                 "status": const.SERVER_FAILURE,
@@ -368,27 +382,63 @@ class AuthService:
             }
 
         return True, totp_secret, None
-    
-    def _log_attempt(self, username: str, start_time: float, result: str,
-                     failure_reason: Optional[str] = None,
-                     retry_after: Optional[int] = None):
+
+    def _calculate_resource_usage(self, tracker: ResourceTracker) -> Dict:
         """
-        Helper to log authentication attempt with automatic latency calculation.
+        Calculate resource usage and performance metrics from tracker.
+
+        Args:
+            tracker: ResourceTracker with start time and resource snapshots
+
+        Returns:
+            Dictionary with latency_ms, cpu_time_ms, memory_delta_kb
+        """
+        # Calculate latency
+        latency_ms = (time.time() - tracker.start_time) * 1000
+
+        # Calculate CPU time used (user + system) in milliseconds
+        cpu_times_end = tracker.process.cpu_times()
+        cpu_time_ms = ((cpu_times_end.user - tracker.cpu_times_start.user) +
+                       (cpu_times_end.system - tracker.cpu_times_start.system)) * 1000
+
+        # Calculate memory delta in KB
+        memory_end = tracker.process.memory_info().rss
+        memory_delta_kb = (memory_end - tracker.memory_start) / 1024
+
+        return {
+            "latency_ms": round(latency_ms, 2),
+            "cpu_time_ms": round(cpu_time_ms, 2),
+            "memory_delta_kb": round(memory_delta_kb, 2)
+        }
+
+    def _log_attempt(self, username: str, result: str,
+                     failure_reason: Optional[str] = None,
+                     retry_after: Optional[int] = None,
+                     totp_required: bool = False,
+                     tracker: Optional[ResourceTracker] = None):
+        """
+        Helper to log authentication attempt with automatic metrics calculation.
 
         Args:
             username: Username attempted
-            start_time: Request start time from time.time()
             result: const.LOG_RESULT_SUCCESS or const.LOG_RESULT_FAILURE
             failure_reason: Optional reason for failure
             retry_after: Optional seconds until retry allowed (for rate limiting)
+            totp_required: Whether TOTP second factor is required (for success with pending TOTP)
+            tracker: Optional ResourceTracker for performance and resource metrics
         """
-        latency_ms = (time.time() - start_time) * 1000
+        # Calculate metrics if tracker provided
+        metrics = None
+        if tracker is not None:
+            metrics = self._calculate_resource_usage(tracker)
+
         log_attempt(
             self.log_filepath,
             username,
             result,
-            latency_ms,
             self.config,
             failure_reason=failure_reason,
             retry_after=retry_after,
+            totp_required=totp_required,
+            metrics=metrics,
         )

