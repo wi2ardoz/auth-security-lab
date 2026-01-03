@@ -127,7 +127,7 @@ pip freeze > requirements.txt
 Run all scenarios automatically:
 
 ```bash
-python src/simulator/simulator.py
+python src/simulator/simulator.py --all
 ```
 
 **Output:**

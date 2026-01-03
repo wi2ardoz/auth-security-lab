@@ -89,7 +89,7 @@ Note: Assumes server is already running and database is seeded.
 
 **Auto Suite Mode (Default):**
 ```bash
-python src/simulator/simulator.py
+python src/simulator/simulator.py --all
 ```
 
 Runs 11 pre-defined scenarios (3 hash baselines + 5 individual defenses + 3 combinations) automatically.
